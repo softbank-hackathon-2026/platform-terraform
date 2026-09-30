@@ -44,8 +44,8 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 |---|---|---|---|---|---|
 | `tf` 실행기 | 완료 | `bash -n` 통과, 자동 기능 테스트 없음 | 해당 없음 | 커밋 `d051afd` | [`tf`](../tf) |
 | EC2 모듈 | 완료 | 포맷과 `terraform validate` 통과, 자동 테스트 없음 | 미수행 | 커밋 `776d3dd`, `3532c5f` | [EC2 AI-DLC](./ai-dlc/ec2-module.md) |
-| Network 모듈 | Private Subnet별 NAT 경로 선택 확장 완료 | 2026-10-01 fmt, validate, mock 10개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 기존 구현 + 미커밋 확장 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
-| S3 모듈 | Regional Domain 출력 추가 완료 | 2026-10-01 fmt, validate, 회귀 mock 4개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 기존 구현 + 미커밋 확장 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
+| Network 모듈 | Private Subnet별 NAT 경로 선택 확장 완료 | 2026-10-01 fmt, validate, mock 10개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 확장 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
+| S3 모듈 | Regional Domain 출력 추가 완료 | 2026-10-01 fmt, validate, 회귀 mock 4개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 확장 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
 | Security Group 모듈 | 완료 | 포맷과 `terraform validate` 통과, mock 테스트 8개 통과 | dev에 사용한 구성의 실제 Plan 확인, Apply 미수행. 기타 옵션은 기존 기록 범위 | 구현 커밋 `8949e16` 원격 main 확인 | [Security Group AI-DLC](./ai-dlc/security-group-module.md) |
 | IAM Policy와 Role 모듈 | 완료, 결합 테스트 Root Provider 선언 보강 | 포맷과 세 구성의 `terraform validate` 통과, mock 테스트 9개 통과. 결합 테스트 2026-09-24 재검증 1개 통과 | dev에 사용한 구성의 실제 Plan 확인, Apply 미수행. 기타 옵션은 기존 기록 범위 | 기존 구현 `2190a91`, 테스트 보강 `df31fab` 원격 main 확인 | [IAM AI-DLC](./ai-dlc/iam-role-policy-modules.md) |
 | 루트 `tests/` 조사 | 결합 테스트 고유 기능 확인 후 유지, 용도 문서화 | 결합 구성 `terraform validate` 통과, mock 테스트 1개 통과 | 해당 없음 | 커밋 `df31fab` 원격 main 확인 | [tests README](../tests/README.md) |
@@ -54,8 +54,8 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 | ECR 모듈 | Unit 1 구현, Test, Review 완료 | 포맷, `terraform validate` 통과, mock 테스트 6개 통과 | dev에 사용한 구성의 실제 Plan 확인, Apply 미수행. 기타 옵션은 기존 기록 범위 | 구현 커밋 `3f6dbdd` 원격 main 확인 | [ECR AI-DLC](./ai-dlc/ecr-module.md) |
 | KMS 모듈 | Unit 1 구현, Test, Review 완료 | 포맷, 구성 검증 통과, mock 테스트 10개 통과 | 실제 AWS 기준 미수행 | 구현 커밋 `2b1f850` 원격 main 확인 | [KMS AI-DLC](./ai-dlc/kms-module.md) |
 | EKS 및 클러스터 공통 구성 | Unit 1, 2 구현, Test, Review 완료. Unit 3~5 미시작 | 두 Unit 포맷, 구성 검증 통과, 각 mock Plan 16개 통과 | 실제 AWS 기준 미수행 | Unit 1 `15fe220`, Unit 2 `4c6c680` 원격 main 확인 | [EKS AI-DLC](./ai-dlc/eks-module.md) |
-| ECS와 CloudFront 모듈 | 구현과 Review 완료 | ECS mock 6개, CloudFront mock 3개, SPA 14개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 미커밋, 미푸시 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
-| 환경별 Root Module | dev ECS/PostgreSQL 구현 완료, stg/prd 미구현 | fmt, validate, 결합 mock 3개와 전체 Plan 점검 2개 통과 | sbh-platform dev 56 add / 0 change / 0 destroy, Apply 미수행 | 미커밋, 미푸시 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
+| ECS와 CloudFront 모듈 | 구현과 Review 완료 | ECS mock 6개, CloudFront mock 3개, SPA 14개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
+| 환경별 Root Module | dev ECS/PostgreSQL 구현 완료, stg/prd 미구현 | fmt, validate, 결합 mock 3개와 전체 Plan 점검 2개 통과 | sbh-platform dev 56 add / 0 change / 0 destroy, Apply 미수행 | 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
 | 지속 문서화 | RDS, ECR 진행 상태 반영, 기존 10개 모듈 README의 입력, 출력 속성 표 정리와 향후 유지 규칙 추가 | 입력 97개, 출력 49개 코드 대조 및 문서 공백 점검 완료 | 해당 없음 | ECR, README 표, 규칙 커밋 `3f6dbdd` 원격 main 확인 | 이 문서 |
 
 IAM 구현 커밋 `2190a91`을 푸시한 직후 로컬 `HEAD`, `origin/main`, 원격 main의 SHA가 모두 `2190a91b4e6023492d71023f6c69a959d1a825b3`인 것을 확인했습니다.
@@ -102,7 +102,7 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ### ECR 모듈
 
-[`modules/ecr`](../modules/ecr/README.md)는 비공개 ECR 저장소 하나를 만듭니다. 태그 불변성, AES256 암호화, 저장소 수준 push 시 스캔 설정이 기본이며, 기존 KMS 키와 Lifecycle Policy를 선택할 수 있습니다. 로컬 mock 검증은 끝났고 실제 AWS Plan, Apply와 이미지 동작은 확인하지 않았습니다. 자세한 범위는 [ECR AI-DLC](./ai-dlc/ecr-module.md)에 기록합니다.
+[`modules/ecr`](../modules/ecr/README.md)는 비공개 ECR 저장소 하나를 만듭니다. 태그 불변성, AES256 암호화, 저장소 수준 push 시 스캔 설정이 기본이며, 기존 KMS 키와 Lifecycle Policy를 선택할 수 있습니다. 로컬 mock 검증과 dev에 사용한 구성의 실제 AWS Plan을 확인했습니다. Apply와 이미지 동작은 확인하지 않았습니다. 자세한 범위는 [ECR AI-DLC](./ai-dlc/ecr-module.md)에 기록합니다.
 
 ### KMS 모듈
 
@@ -148,7 +148,10 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ECS/PostgreSQL dev 구현과 로컬 검증, 실제 AWS Plan 검토를 완료했습니다. mock Plan 26개, SPA 14개와 결합 Plan 점검 2개가 통과했습니다. dev 결합 mock은 기존 RDS의 ephemeral 선언 때문에 공식 Terraform 1.17.0-beta2로 실행했고 실제 Plan은 안정 버전 1.16.4로 실행했습니다. 상세 날짜와 명령은 [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md)에 있습니다.
 
-1. 현재 Plan을 검토하고 별도 배포 요청을 받은 후 인프라 Apply를 진행합니다. 이번 작업은 Apply, 업로드, DB 계정 생성, ECS 시작과 장애 전환을 수행하지 않았습니다.
-2. 앱 이미지, DB 사용자/Secret과 프론트 빌드를 준비한 뒤 서비스 활성화 Plan을 검토하고 실제 두 AZ 배치와 API/DB 접속을 검증합니다.
-3. EKS의 미완료 Unit 3~5와 stg/prd Root Module은 기존 후속 작업으로 남깁니다. 일반 RDS RR의 모듈 소유 Secret 회전/복구도 별도 운영 작업입니다.
-4. 계획, 로컬 테스트, AWS Plan, Apply, 배포, 커밋과 푸시를 계속 구분합니다. 이번 변경은 커밋과 푸시를 하지 않았습니다.
+구현 커밋 `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`을 `codex/ecs-postgresql-dev`에 푸시하고 원격 SHA 일치를 확인했습니다. 제공한 ADR의 네이밍과 태깅 수정은 아직 시작하지 않았으며 이번 구현 커밋에 포함하지 않았습니다.
+
+1. 후속 작업으로 제공한 네이밍과 태깅 규칙을 적용하고 테스트와 실제 AWS Plan을 다시 확인합니다. ADR의 팀 승인 상태는 별도로 유지합니다.
+2. 수정 후 Plan을 검토하고 별도 배포 요청을 받은 후 인프라 Apply를 진행합니다. 이번 작업은 Apply, 업로드, DB 계정 생성, ECS 시작과 장애 전환을 수행하지 않았습니다.
+3. 앱 이미지, DB 사용자/Secret과 프론트 빌드를 준비한 뒤 서비스 활성화 Plan을 검토하고 실제 두 AZ 배치와 API/DB 접속을 검증합니다.
+4. EKS의 미완료 Unit 3~5와 stg/prd Root Module은 기존 후속 작업으로 남깁니다. 일반 RDS RR의 모듈 소유 Secret 회전/복구도 별도 운영 작업입니다.
+5. 계획, 로컬 테스트, AWS Plan, Apply, 배포, 커밋과 푸시를 계속 구분합니다.

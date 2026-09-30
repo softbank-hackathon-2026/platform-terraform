@@ -12,7 +12,7 @@
 | 로컬 검증 | 포맷과 validate 통과. mock Plan 26개, SPA 14개, dev 전체 Plan 점검 2개 통과 |
 | 실제 AWS Plan | `sbh-platform`, 서울, S3 Backend에서 56 add / 0 change / 0 destroy 확인 |
 | Apply와 배포 | 사용자 지시로 수행하지 않음 |
-| 커밋과 푸시 | 수행하지 않음 |
+| 커밋과 푸시 | 구현 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` SHA 일치 확인 |
 
 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 Ideation, Inception과 각 Unit의 Design 및 Implementation Plan 승인을 포함합니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
 
@@ -111,7 +111,13 @@ Backend 버킷은 사용자가 지정한 `sbh-platform-prod-s3-tf`, Key는 추�
 
 ## 4. Operation
 
-배포, 관측, 롤백과 장애 검증 절차를 [Runbook](../runbooks/ecs-postgresql-platform.md)에 작성했습니다. Apply, 파일과 이미지 업로드, DB 계정 생성, ECS 시작과 실제 장애 전환은 실행하지 않았습니다. 다음 작업은 이 Plan을 검토한 뒤 별도 배포 요청을 받는 것입니다.
+배포, 관측, 롤백과 장애 검증 절차를 [Runbook](../runbooks/ecs-postgresql-platform.md)에 작성했습니다. Apply, 파일과 이미지 업로드, DB 계정 생성, ECS 시작과 실제 장애 전환은 실행하지 않았습니다. 배포는 후속 수정과 Plan 검토를 마친 뒤 별도 요청을 받아 진행합니다.
+
+## Git 반영과 후속 요청
+
+2026-10-01 사용자의 현재 변경 커밋과 푸시 요청에 따라 `codex/ecs-postgresql-dev` 브랜치를 생성했습니다. 구현, 테스트와 검증 기록 47개 파일을 커밋 `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`으로 푸시하고 원격 SHA 일치를 확인했습니다. State, Plan, 로그와 로컬 Backend 설정은 Git에서 제외했습니다.
+
+제공한 ADR의 네이밍과 태깅 수정 요청은 후속 작업입니다. 이번 구현 커밋에는 아직 반영하지 않았습니다. 수정 후 로컬 검증과 실제 AWS Plan을 다시 확인하며 `sbh-platform`과 Apply 금지 조건을 유지합니다. ADR의 팀 승인 상태는 변경하지 않았습니다.
 
 ## 검증 기록
 
@@ -140,5 +146,11 @@ Backend 버킷은 사용자가 지정한 `sbh-platform-prod-s3-tf`, Key는 추�
 | 2026-10-01 | `git check-ignore`로 Plan, JSON, 로그와 로컬 Backend 점검 | 모두 Git 제외. dev Provider Lock 파일은 제외하지 않음 |
 | 2026-10-01 | `AWS_PROFILE=sbh-platform ./tf dev workspace show` | default workspace 확인 |
 | 2026-10-01 | 같은 프로필의 `s3api list-objects-v2`로 승인 Key 접두사 조회 | 현재 State와 잠금 파일 객체 없음. Apply 미수행 상태 확인 |
+| 2026-10-01 | 커밋 직전 `git diff --check`, `terraform fmt -check -recursive env/dev modules/network modules/s3 modules/ecs modules/cloudfront` | PASS |
+| 2026-10-01 | 커밋 직전 `python3 scripts/check-dev-test-plan.py .local/dev-tests.jsonl` | 저장된 초기 구성과 활성화 구성의 전체 Plan 점검 2개 PASS |
+| 2026-10-01 | 커밋 후보 47개 파일의 민감 정보 패턴과 제외 파일 점검 | 개인 키, AWS 키, GitHub 토큰 패턴 일치 없음. State와 로컬 설정 포함 없음 |
+| 2026-10-01 | `git switch -c codex/ecs-postgresql-dev`, `git commit -m "feat: add ECS and PostgreSQL dev infrastructure"` | 구현 커밋 `c1a36ed` 생성 |
+| 2026-10-01 | `git push -u origin codex/ecs-postgresql-dev` | 원격 브랜치 생성과 푸시 완료 |
+| 2026-10-01 | `git ls-remote origin refs/heads/codex/ecs-postgresql-dev` | 원격 SHA `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`, 구현 커밋과 일치 |
 
 Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되어 허용된 실행 환경에서 재시도했습니다. 최초 Network 테스트의 빈 NAT 대상 비교와 mock Plan의 unknown 비교를 수정한 뒤 관련 테스트를 다시 실행했습니다. 최종 결과만 PASS로 표시했으며 Apply와 배포 결과는 없습니다.
