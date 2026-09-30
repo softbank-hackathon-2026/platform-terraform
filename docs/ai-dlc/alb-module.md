@@ -1,6 +1,6 @@
 # ALB module AI-DLC
 
-마지막 확인일: 2026-09-23
+마지막 확인일: 2026-10-01
 
 ## 현재 상태
 
@@ -10,11 +10,11 @@
 | Inception | 요구사항과 인수 기준 승인 |
 | Construction | 최초 두 Unit과 Listener 확장의 구현, Test, Review 완료 |
 | 구현과 테스트 | 완료, 확장 후 포맷 및 구성 검증과 mock 테스트 15개 통과 |
-| Terraform Plan과 Apply | mock provider Plan 테스트만 수행, 실제 AWS 기준 미수행 |
+| Terraform Plan과 Apply | dev에 사용한 구성 실제 AWS Plan 확인. Apply와 다른 옵션의 AWS 검증은 미수행 |
 | AWS 리소스 확인 | 미수행 |
 | 커밋과 푸시 | 구현 커밋 `50b854f`를 원격 main에 푸시하고 원격 SHA 확인 |
 | Operation | 시작하지 않음 |
-| 0개·여러 개 Listener 확장 | 구현, Test, Review 완료. 기존 12개 테스트는 확장 전 결과로 별도 보존 |
+| 0개, 여러 개 Listener 확장 | 구현, Test, Review 완료. 기존 12개 테스트는 확장 전 결과로 별도 보존 |
 
 ## 1. Ideation
 
@@ -126,9 +126,9 @@ Root Module
 ### Unit 1 Implementation Plan: ALB와 기본 전달
 
 1. `modules/alb`에 버전 조건, ALB, Target Group, 기본 전달 Listener를 작성합니다.
-2. 필수 네트워크 입력, 대상 유형·포트·상태 확인, HTTP/HTTPS 인증서·TLS 정책 입력을 정의하고 조합을 검증합니다.
-3. ALB DNS와 Zone ID, ALB·Target Group·Listener ARN을 출력합니다.
-4. README에 기존 Network·Security Group 연결, 대상 등록 주체, 내부 HTTP 및 공개 HTTPS 예시를 작성합니다.
+2. 필수 네트워크 입력, 대상 유형, 포트, 상태 확인, HTTP/HTTPS 인증서, TLS 정책 입력을 정의하고 조합을 검증합니다.
+3. ALB DNS와 Zone ID, ALB, Target Group, Listener ARN을 출력합니다.
+4. README에 기존 Network, Security Group 연결, 대상 등록 주체, 내부 HTTP 및 공개 HTTPS 예시를 작성합니다.
 5. mock provider 테스트로 기본 내부 HTTP, HTTPS, 공개형 HTTP 거부, 잘못된 네트워크 입력을 확인합니다.
 
 ### Unit 2 Implementation Plan: HTTP→HTTPS 리디렉션
@@ -148,7 +148,7 @@ Root Module
 #### Unit 1: ALB와 기본 전달
 
 - [`main.tf`](../../modules/alb/main.tf): 내부형 또는 공개형 ALB, Target Group, 기본 HTTP/HTTPS Listener
-- [`variables.tf`](../../modules/alb/variables.tf): 네트워크·대상·Listener 입력과 이름, 포트, 인증서 조합 검증
+- [`variables.tf`](../../modules/alb/variables.tf): 네트워크, 대상, Listener 입력과 이름, 포트, 인증서 조합 검증
 - [`outputs.tf`](../../modules/alb/outputs.tf): ALB, Target Group, Listener 식별 정보
 - [`versions.tf`](../../modules/alb/versions.tf): Terraform과 AWS Provider 버전 조건
 - [`README.md`](../../modules/alb/README.md): 기본 사용법, 공개형 HTTPS, Security Group 및 대상 등록 경계
@@ -178,7 +178,7 @@ mock provider 테스트는 실제 AWS 계정의 Plan, Apply 또는 대상의 정
 
 - 기본 구성은 내부형 IPv4 ALB이며, 공개형은 HTTPS와 인증서가 있어야 합니다. 선택적 HTTP Listener는 HTTPS로만 리디렉션합니다.
 - Target Group의 `target_protocol`이 HTTPS이면 상태 확인도 HTTPS를 사용합니다. 기본값은 둘 다 HTTP입니다.
-- 대상 등록과 ALB·대상 Security Group 규칙은 호출자가 관리합니다. 모듈에는 대상 Attachment가 없습니다.
+- 대상 등록과 ALB, 대상 Security Group 규칙은 호출자가 관리합니다. 모듈에는 대상 Attachment가 없습니다.
 - Subnet ID 중복은 거부하지만 서로 다른 AZ, 여유 IP, 유효한 인증서 및 실제 네트워크 연결은 mock 테스트로 확인할 수 없습니다.
 - 환경별 Root Module이 없으므로 실제 AWS Plan과 Apply는 수행하지 않았습니다.
 
@@ -186,7 +186,7 @@ mock provider 테스트는 실제 AWS 계정의 Plan, Apply 또는 대상의 정
 
 Deployment, Observability, Rollback, Runbook은 시작하지 않았습니다. 환경별 Root Module과 실제 AWS 연결은 별도 작업에서 다룹니다.
 
-## 5. Listener 0개·여러 개 확장
+## 5. Listener 0개, 여러 개 확장
 
 기존 1~4절은 2026-09-23 승인된 단일 기본 Listener 구현과 검증의 기록입니다. 아래 확장은 후속 변경 요청이며, 위의 테스트 결과를 새 구조의 검증 결과로 간주하지 않습니다.
 
@@ -206,7 +206,7 @@ Deployment, Observability, Rollback, Runbook은 시작하지 않았습니다. �
 - Listener별 서로 다른 Target Group 선택 또는 같은 Target Group 공유
 - 기본 전달 및 HTTP→HTTPS 리디렉션 동작
 - 논리 키를 사용하는 Target Group ARN과 Listener ARN 출력 Map
-- 기존 공개형 HTTPS 정책, 이름·포트 검증, 대상 등록 및 Security Group 경계 유지
+- 기존 공개형 HTTPS 정책, 이름, 포트 검증, 대상 등록 및 Security Group 경계 유지
 
 #### Non-goals
 
@@ -299,7 +299,7 @@ Root Module
 - Listener 1개와 Target Group 1개 구성은 기존 HTTP 또는 HTTPS 전달 동작을 재현합니다.
 - Listener 3개가 2개 Target Group을 각각 선택하거나 공유하고, HTTP Listener 하나가 지정한 HTTPS Listener로 301 리디렉션합니다.
 - 중복 Listener 포트, 없는 Target Group 또는 HTTPS 리디렉션 대상, 공개형 HTTP 전달, 인증서 없는 HTTPS를 거부합니다.
-- Terraform 포맷, `terraform validate`, `terraform test`를 실제 실행하고 날짜·명령·결과를 별도로 기록합니다.
+- Terraform 포맷, `terraform validate`, `terraform test`를 실제 실행하고 날짜, 명령, 결과를 별도로 기록합니다.
 
 ### Construction: Design과 Implementation Plan
 
@@ -315,7 +315,7 @@ Root Module
 2. `aws_lb_target_group`과 `aws_lb_listener`에 `for_each`를 적용하고 Listener별 전달 또는 리디렉션 기본 동작을 구성합니다.
 3. Map 키, 이름, 포트, 프로토콜, 인증서, 대상 키, 리디렉션 키 및 공개형 정책의 입력 제약을 검증합니다.
 4. README에 ALB만 생성하는 예시와 여러 Listener가 서로 다른 Target Group을 선택하는 예시를 작성합니다. Root Module의 대상 등록 예시도 Map 출력으로 고칩니다.
-5. mock provider 테스트를 0개·1개·여러 개 구성과 잘못된 조합에 맞춰 갱신합니다. 포맷, 구성 검증, 테스트를 실행한 뒤 이 문서와 `docs/README.md`에 실제 결과를 기록하고 Review합니다.
+5. mock provider 테스트를 0개, 1개, 여러 개 구성과 잘못된 조합에 맞춰 갱신합니다. 포맷, 구성 검증, 테스트를 실행한 뒤 이 문서와 `docs/README.md`에 실제 결과를 기록하고 Review합니다.
 
 #### Approval
 
@@ -333,12 +333,12 @@ Root Module
 #### Implementation
 
 - [`main.tf`](../../modules/alb/main.tf): ALB 하나, 논리 키별 Target Group, 전달 Listener와 리디렉션 Listener. 리디렉션 Listener는 전달 Listener 생성 이후에 배치
-- [`variables.tf`](../../modules/alb/variables.tf): 빈 Map 기본값, Target Group과 Listener별 설정, VPC 조건 및 참조·포트·프로토콜 검증
+- [`variables.tf`](../../modules/alb/variables.tf): 빈 Map 기본값, Target Group과 Listener별 설정, VPC 조건 및 참조, 포트, 프로토콜 검증
 - [`outputs.tf`](../../modules/alb/outputs.tf): Target Group과 Listener ARN을 논리 키별 Map으로 출력
 - [`README.md`](../../modules/alb/README.md): ALB만 생성, 단일 Listener, 여러 서비스 전달 및 대상 등록 예시
-- [`alb.tftest.hcl`](../../modules/alb/tests/alb.tftest.hcl): 0개·1개·여러 개 구성 및 잘못된 조합 mock Plan 테스트
+- [`alb.tftest.hcl`](../../modules/alb/tests/alb.tftest.hcl): 0개, 1개, 여러 개 구성 및 잘못된 조합 mock Plan 테스트
 
-구현에서는 전달 Listener와 리디렉션 Listener를 별도 `aws_lb_listener` 리소스 Map으로 나눴습니다. 리디렉션 대상인 HTTPS Listener가 먼저 생성되도록 의존성을 명시하기 위한 결정이며, 승인된 입력·출력 계약은 유지합니다.
+구현에서는 전달 Listener와 리디렉션 Listener를 별도 `aws_lb_listener` 리소스 Map으로 나눴습니다. 리디렉션 대상인 HTTPS Listener가 먼저 생성되도록 의존성을 명시하기 위한 결정이며, 승인된 입력, 출력 계약은 유지합니다.
 
 #### Test
 
@@ -381,3 +381,7 @@ Root Module
 - [AWS ALB Listener 동작과 Listener가 없는 상태](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html)
 - [AWS CreateListener 중복 포트 오류](https://docs.aws.amazon.com/elasticloadbalancing/latest/APIReference/API_CreateListener.html)
 - [Terraform `for_each`와 논리 키](https://developer.hashicorp.com/terraform/language/meta-arguments/for_each)
+
+## 2026-10-01 dev 결합 검증
+
+사용자가 ECS와 PostgreSQL 플랫폼 구현 계획을 승인했습니다. Internal ALB, HTTP 80 Listener와 IP Target Group 하나를 `env/dev`에 연결했고 `AWS_PROFILE=sbh-platform ./tf dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev.tfplan`으로 전체 56 add, 0 change, 0 destroy를 확인했습니다. Apply와 배포는 하지 않았으며 이 결과는 다른 모듈 옵션의 AWS 검증을 포함하지 않습니다. 자세한 로컬 테스트와 명령은 [Platform AI-DLC](./ecs-postgresql-platform.md)에 있습니다.

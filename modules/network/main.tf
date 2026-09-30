@@ -4,8 +4,12 @@ locals {
     [for subnet in values(var.private_subnets) : subnet.cidr_block]
   )
 
+  nat_private_subnets = {
+    for key, subnet in var.private_subnets : key => subnet if subnet.enable_nat_route
+  }
+
   private_availability_zones = toset([
-    for subnet in values(var.private_subnets) : subnet.availability_zone
+    for subnet in values(local.nat_private_subnets) : subnet.availability_zone
   ])
 
   create_internet_gateway = length(var.public_subnets) > 0 || var.nat_gateway_mode != "none"
@@ -21,7 +25,8 @@ locals {
   ])
 
   zonal_nat_covers_private_availability_zones = (
-    toset(keys(var.zonal_nat_subnet_keys)) == local.private_availability_zones
+    length(setsubtract(toset(keys(var.zonal_nat_subnet_keys)), local.private_availability_zones)) == 0 &&
+    length(setsubtract(local.private_availability_zones, toset(keys(var.zonal_nat_subnet_keys)))) == 0
   )
 
   zonal_nat_configuration_valid = (
@@ -66,7 +71,7 @@ resource "aws_vpc" "this" {
 
     precondition {
       condition     = var.nat_gateway_mode != "zonal" || local.zonal_nat_covers_private_availability_zones
-      error_message = "zonal_nat_subnet_keys는 모든 Private Subnet AZ를 정확히 포함해야 합니다."
+      error_message = "zonal_nat_subnet_keys는 enable_nat_route가 true인 Private Subnet AZ를 정확히 포함해야 합니다."
     }
   }
 }
@@ -189,15 +194,15 @@ resource "aws_nat_gateway" "zonal" {
 }
 
 resource "aws_route" "private_regional" {
-  for_each = var.nat_gateway_mode == "regional" ? aws_route_table.private : {}
+  for_each = var.nat_gateway_mode == "regional" ? local.nat_private_subnets : {}
 
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.regional[0].id
-  route_table_id         = each.value.id
+  route_table_id         = aws_route_table.private[each.key].id
 }
 
 resource "aws_route" "private_zonal" {
-  for_each = local.zonal_nat_configuration_valid ? var.private_subnets : {}
+  for_each = local.zonal_nat_configuration_valid ? local.nat_private_subnets : {}
 
   destination_cidr_block = "0.0.0.0/0"
   nat_gateway_id         = aws_nat_gateway.zonal[each.value.availability_zone].id

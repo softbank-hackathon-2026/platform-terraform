@@ -1,0 +1,4 @@
+# Copy to backend.local.hcl, which is excluded from Git.
+# The state bucket must already exist separately from the frontend bucket.
+bucket = "existing-state-bucket"
+key    = "sbh-platform/dev/terraform.tfstate"

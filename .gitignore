@@ -1,0 +1,12 @@
+**/.terraform/
+.local/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+crash*.log
+*.tfvars
+*.tfvars.json
+*.local.hcl
+**/.terraform.lock.hcl
+!/env/dev/.terraform.lock.hcl

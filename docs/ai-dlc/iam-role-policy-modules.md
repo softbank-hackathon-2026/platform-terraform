@@ -1,6 +1,6 @@
 # IAM Role and Policy modules AI-DLC
 
-마지막 확인일: 2026-09-24
+마지막 확인일: 2026-10-01
 
 ## 현재 상태
 
@@ -10,7 +10,7 @@
 | Inception | 요구사항 승인 |
 | Construction | 두 Unit의 구현, Test, Review 완료. 결합 테스트 Root Provider 선언 보강 |
 | 구현과 테스트 | 두 모듈과 결합 구성의 mock 테스트 9개 통과. 2026-09-24 결합 테스트 1개 재검증 통과 |
-| Terraform Plan과 Apply | mock provider Plan만 수행, 실제 AWS 기준 미수행 |
+| Terraform Plan과 Apply | dev에 사용한 구성 실제 AWS Plan 확인. Apply와 다른 옵션의 AWS 검증은 미수행 |
 | AWS 리소스 확인 | 미수행 |
 | 커밋과 푸시 | 기존 구현 `2190a91`, 결합 테스트 보강 `df31fab` 원격 main 확인 |
 | Operation | 시작하지 않음 |
@@ -156,7 +156,7 @@ EC2는 Instance Profile 이름을 사용합니다. 다른 서비스에서 Role�
 - [`role.tftest.hcl`](../../modules/iam/role/tests/role.tftest.hcl): mock provider Plan 테스트
 - [`iam-composition`](../../tests/iam-composition/main.tf): 새 Policy ARN, Role, Instance Profile, 기존 EC2 모듈을 연결하는 테스트 전용 Root Module
 
-2026-09-24 루트 `tests/` 디렉터리의 용도와 삭제 가능 여부를 조사했습니다. 결합 테스트는 개별 Policy·Role 테스트가 검증하지 않는 모듈 간 연결을 확인하므로 디렉터리를 유지합니다. [`versions.tf`](../../tests/iam-composition/versions.tf)에 테스트 Root의 AWS Provider 요구 조건을 명시하고 [`tests/README.md`](../../tests/README.md)에 용도와 실행 방법을 기록했습니다.
+2026-09-24 루트 `tests/` 디렉터리의 용도와 삭제 가능 여부를 조사했습니다. 결합 테스트는 개별 Policy, Role 테스트가 검증하지 않는 모듈 간 연결을 확인하므로 디렉터리를 유지합니다. [`versions.tf`](../../tests/iam-composition/versions.tf)에 테스트 Root의 AWS Provider 요구 조건을 명시하고 [`tests/README.md`](../../tests/README.md)에 용도와 실행 방법을 기록했습니다.
 
 ### Test
 
@@ -199,7 +199,7 @@ mock provider 테스트는 실제 AWS 계정의 Plan, Apply, IAM 권한 적용�
 - Role README에 신뢰 정책과 인라인 권한 정책의 차이, 기존 관리형 Policy ARN 연결, EC2에서 Instance Profile 옵션이 필요한 이유와 옵션이 꺼졌을 때 EC2에 Role이 연결되지 않는 동작을 명시했습니다.
 - JSON 구문만 입력 단계에서 검증합니다. 정책의 최소 권한, 신뢰 정책의 실제 AWS 유효성, IAM 전파 지연, 서비스 연결 성공 여부는 mock 테스트로 확인할 수 없습니다.
 - 환경별 Root Module이 없으므로 실제 AWS Plan과 Apply는 수행하지 않았습니다.
-- 2026-09-24 현재 루트 `tests/iam-composition`은 유일한 Policy·Role·Instance Profile·EC2 결합 mock 테스트입니다. 삭제하면 이 검증이 사라집니다. 현재 Provider에서도 테스트가 실행되도록 Root의 Provider 요구 선언을 추가했으며, 모듈 자체는 변경하지 않았습니다.
+- 2026-09-24 현재 루트 `tests/iam-composition`은 유일한 Policy, Role, Instance Profile, EC2 결합 mock 테스트입니다. 삭제하면 이 검증이 사라집니다. 현재 Provider에서도 테스트가 실행되도록 Root의 Provider 요구 선언을 추가했으며, 모듈 자체는 변경하지 않았습니다.
 
 ### 결합 테스트 보강 커밋과 푸시
 
@@ -220,3 +220,7 @@ Deployment, Observability, Rollback, Runbook은 아직 시작하지 않았습니
 - [Terraform AWS Provider IAM Role](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role)
 - [Terraform AWS Provider IAM Role Policy Attachment](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_role_policy_attachment)
 - [Terraform AWS Provider IAM Instance Profile](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/iam_instance_profile)
+
+## 2026-10-01 dev 결합 검증
+
+사용자가 ECS와 PostgreSQL 플랫폼 구현 계획을 승인했습니다. 분리한 ECS Execution/Task Role과 실행 Policy를 `env/dev`에 연결했고 `AWS_PROFILE=sbh-platform ./tf dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev.tfplan`으로 전체 56 add, 0 change, 0 destroy를 확인했습니다. Apply와 배포는 하지 않았으며 이 결과는 다른 모듈 옵션의 AWS 검증을 포함하지 않습니다. 자세한 로컬 테스트와 명령은 [Platform AI-DLC](./ecs-postgresql-platform.md)에 있습니다.

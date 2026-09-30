@@ -24,12 +24,20 @@ Security Group, VPC Endpoint, VPC Peering, Transit Gateway, VPN, Network Firewal
 | `zonal_nat_subnet_keys` | `map(string)` | `{}` | Zonal NAT를 배치할 Public Subnet 논리 키를 AZ별로 지정합니다. |
 | `tags` | `map(string)` | `{}` | 네트워크 리소스에 붙일 추가 태그입니다. Name은 모듈 이름이 우선합니다. |
 
-`public_subnets`와 `private_subnets`의 각 값은 같은 구조를 사용합니다.
+`public_subnets`의 내부 속성입니다.
 
-| 내부 속성 | 타입 | 역할 |
-|---|---|---|
-| `availability_zone` | `string` | Subnet을 생성할 AZ입니다. |
-| `cidr_block` | `string` | Subnet의 IPv4 CIDR입니다. |
+| 내부 속성 | 타입 | 기본값 | 역할 |
+|---|---|---|---|
+| `availability_zone` | `string` | 필수 | Subnet을 생성할 AZ입니다. |
+| `cidr_block` | `string` | 필수 | Subnet의 IPv4 CIDR입니다. |
+
+`private_subnets`의 내부 속성입니다.
+
+| 내부 속성 | 타입 | 기본값 | 역할 |
+|---|---|---|---|
+| `availability_zone` | `string` | 필수 | Subnet을 생성할 AZ입니다. |
+| `cidr_block` | `string` | 필수 | Subnet의 IPv4 CIDR입니다. |
+| `enable_nat_route` | `bool` | `true` | NAT 모드가 활성화되면 기본 경로를 생성합니다. `false`인 DB Subnet은 NAT 경로와 NAT 대상 AZ 계산에서 제외됩니다. |
 
 ## 출력 속성
 
@@ -41,15 +49,31 @@ Security Group, VPC Endpoint, VPC Peering, Transit Gateway, VPN, Network Firewal
 | `private_subnet_ids` | 논리 키별 Private Subnet ID Map입니다. |
 | `public_route_table_id` | Public Route Table ID입니다. Public Subnet이 없으면 `null`입니다. |
 | `private_route_table_ids` | 논리 키별 Private Route Table ID Map입니다. |
-| `nat_gateway_ids_by_az` | AZ별 NAT Gateway ID Map입니다. NAT가 없으면 `{}`입니다. |
+| `nat_gateway_ids_by_az` | NAT 경로를 사용하는 AZ별 NAT Gateway ID Map입니다. NAT가 없으면 `{}`입니다. |
 
 ## NAT 모드
 
 | 모드 | 동작 |
 |---|---|
 | `none` | NAT Gateway와 Private 인터넷 기본 경로를 생성하지 않습니다. |
-| `regional` | Regional NAT Gateway 하나를 생성하고 모든 Private Route를 연결합니다. |
-| `zonal` | Private Subnet이 사용하는 각 AZ에 EIP와 Zonal NAT Gateway를 생성합니다. |
+| `regional` | Regional NAT Gateway 하나를 생성하고 `enable_nat_route = true`인 Private Route를 연결합니다. |
+| `zonal` | `enable_nat_route = true`인 Private Subnet이 사용하는 각 AZ에 EIP와 Zonal NAT Gateway를 생성합니다. |
+
+`enable_nat_route`를 생략하면 기존 호출과 동일하게 동작합니다. DB처럼 인터넷 기본 경로가 없어야 하는 Subnet은 `false`를 지정하세요. `regional` 모드는 대상 Subnet이 없어도 명시한 NAT 하나를 생성합니다. `zonal` 모드는 대상 AZ가 없으면 빈 AZ Map을 사용합니다.
+
+```hcl
+private_subnets = {
+  app_a = {
+    availability_zone = "ap-northeast-2a"
+    cidr_block        = "10.20.10.0/24"
+  }
+  db_a = {
+    availability_zone = "ap-northeast-2a"
+    cidr_block        = "10.20.20.0/24"
+    enable_nat_route  = false
+  }
+}
+```
 
 NAT Gateway에는 시간 및 데이터 처리 비용이 발생합니다. `nat_gateway_mode` 변경 시 NAT Gateway와 EIP가 생성되거나 제거되고 인터넷 송신이 일시적으로 중단될 수 있으므로 적용 전에 Plan을 확인하세요.
 

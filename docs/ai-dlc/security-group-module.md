@@ -1,6 +1,6 @@
 # Security Group module AI-DLC
 
-마지막 확인일: 2026-09-23
+마지막 확인일: 2026-10-01
 
 ## 현재 상태
 
@@ -10,7 +10,7 @@
 | Inception | 요구사항 승인 |
 | Construction | 구현, Test, Review 완료 |
 | 구현과 테스트 | 완료, 포맷과 구성 검증 및 mock 테스트 8개 통과 |
-| Terraform Plan과 Apply | mock provider Plan만 수행, 실제 AWS 기준 미수행 |
+| Terraform Plan과 Apply | dev에 사용한 구성 실제 AWS Plan 확인. Apply와 다른 옵션의 AWS 검증은 미수행 |
 | AWS 리소스 확인 | 미수행 |
 | 커밋과 푸시 | 구현 커밋 `8949e16` 푸시 완료, 원격 main SHA 일치 확인 |
 | Operation | 시작하지 않음 |
@@ -171,3 +171,7 @@ Deployment, Observability, Rollback, Runbook은 아직 시작하지 않았습니
 - [Terraform AWS Provider Security Group](https://github.com/hashicorp/terraform-provider-aws/blob/main/website/docs/r/security_group.html.markdown)
 - [Terraform AWS Provider 인바운드 규칙](https://github.com/hashicorp/terraform-provider-aws/blob/main/website/docs/r/vpc_security_group_ingress_rule.html.markdown)
 - [Terraform AWS Provider 아웃바운드 규칙](https://github.com/hashicorp/terraform-provider-aws/blob/main/website/docs/r/vpc_security_group_egress_rule.html.markdown)
+
+## 2026-10-01 dev 결합 검증
+
+사용자가 ECS와 PostgreSQL 플랫폼 구현 계획을 승인했습니다. dev ALB/ECS/DB 세 그룹과 Root Module의 제한 규칙를 `env/dev`에 연결했고 `AWS_PROFILE=sbh-platform ./tf dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev.tfplan`으로 전체 56 add, 0 change, 0 destroy를 확인했습니다. Apply와 배포는 하지 않았으며 이 결과는 다른 모듈 옵션의 AWS 검증을 포함하지 않습니다. 자세한 로컬 테스트와 명령은 [Platform AI-DLC](./ecs-postgresql-platform.md)에 있습니다.
