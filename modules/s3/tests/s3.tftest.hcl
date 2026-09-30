@@ -9,6 +9,19 @@ variables {
 run "private_bucket_defaults" {
   command = plan
 
+  override_resource {
+    target          = aws_s3_bucket.this
+    override_during = plan
+    values = {
+      bucket_regional_domain_name = "sample-test-data.s3.ap-northeast-2.amazonaws.com"
+    }
+  }
+
+  assert {
+    condition     = output.bucket_regional_domain_name == "sample-test-data.s3.ap-northeast-2.amazonaws.com"
+    error_message = "CloudFront용 리전별 S3 도메인이 출력되어야 합니다."
+  }
+
   assert {
     condition = (
       aws_s3_bucket.this.bucket == "sample-test-data" &&

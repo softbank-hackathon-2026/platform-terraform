@@ -25,6 +25,7 @@
 |---|---|
 | `bucket_name` | 생성된 버킷 이름입니다. |
 | `bucket_arn` | 생성된 버킷 ARN입니다. |
+| `bucket_regional_domain_name` | CloudFront S3 Origin에 사용할 리전별 버킷 도메인입니다. |
 
 ## 사용 예시
 

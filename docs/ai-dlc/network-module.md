@@ -1,6 +1,6 @@
 # Network module AI-DLC
 
-마지막 확인일: 2026-09-22
+마지막 확인일: 2026-10-01
 
 이 문서는 승인된 AI-DLC 단계, 현재 코드, 실제 테스트 결과를 이어서 확인할 수 있도록 작성했습니다.
 
@@ -9,8 +9,8 @@
 | 구분 | 상태 |
 |---|---|
 | 구현 | 완료 |
-| 로컬 검증 | 포맷과 `terraform validate` 통과, mock 테스트 7개 통과 |
-| Terraform Plan | mock provider Plan만 수행, 실제 AWS Plan 미수행 |
+| 로컬 검증 | 2026-10-01 fmt, validate와 mock 10개 통과 |
+| Terraform Plan | dev Zonal NAT 구성 실제 AWS Plan 확인. Apply 미수행 |
 | Terraform Apply | 미수행 |
 | AWS 리소스 확인 | 미수행 |
 | 커밋 | `3587c82` |
@@ -157,3 +157,9 @@ Regional NAT는 VPC에 생성되므로 Subnet을 선택하지 않습니다. Zona
 | Runbook | 없음 |
 
 환경별 Root Module에 연결한 뒤 Terraform Plan을 먼저 검토해야 합니다. Apply와 AWS 리소스 확인은 실행 결과가 있을 때만 이 문서에 추가합니다.
+
+## 2026-10-01 dev 결합 검증
+
+사용자가 ECS와 PostgreSQL 플랫폼 구현 계획을 승인했습니다. 두 AZ Zonal NAT와 App/DB 경로 분리를 `env/dev`에 연결했고 `AWS_PROFILE=sbh-platform ./tf dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev.tfplan`으로 전체 56 add, 0 change, 0 destroy를 확인했습니다. Apply와 배포는 하지 않았으며 이 결과는 다른 모듈 옵션의 AWS 검증을 포함하지 않습니다. 자세한 로컬 테스트와 명령은 [Platform AI-DLC](./ecs-postgresql-platform.md)에 있습니다.
+
+기존 private_subnets 호출은 NAT 경로 선택 값을 생략하면 그대로 동작합니다. 2026-10-01 `terraform validate -no-color`와 `terraform test -no-color`로 기존 7개와 DB 격리 3개, 총 10개를 실행해 통과했습니다. 새 속성과 기본값은 모듈 README에 반영했습니다.

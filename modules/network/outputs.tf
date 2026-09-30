@@ -35,7 +35,7 @@ output "private_route_table_ids" {
 }
 
 output "nat_gateway_ids_by_az" {
-  description = "Availability Zone을 키로 하는 NAT Gateway ID Map입니다."
+  description = "NAT 경로를 사용하는 Availability Zone을 키로 하는 NAT Gateway ID Map입니다."
   value = merge(
     var.nat_gateway_mode == "regional" ? {
       for availability_zone in local.private_availability_zones :

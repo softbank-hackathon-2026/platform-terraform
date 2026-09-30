@@ -177,6 +177,75 @@ run "rejects_invalid_mode" {
   ]
 }
 
+run "isolated_db_excluded_from_zonal_nat" {
+  command = plan
+
+  variables {
+    nat_gateway_mode = "zonal"
+    public_subnets = {
+      nat_a = { availability_zone = "ap-northeast-2a", cidr_block = "10.10.0.0/24" }
+    }
+    private_subnets = {
+      app_a = { availability_zone = "ap-northeast-2a", cidr_block = "10.10.10.0/24" }
+      db_a  = { availability_zone = "ap-northeast-2a", cidr_block = "10.10.20.0/24", enable_nat_route = false }
+      db_c  = { availability_zone = "ap-northeast-2c", cidr_block = "10.10.21.0/24", enable_nat_route = false }
+    }
+    zonal_nat_subnet_keys = { "ap-northeast-2a" = "nat_a" }
+  }
+
+  assert {
+    condition = (
+      length(aws_subnet.private) == 3 &&
+      length(aws_route_table.private) == 3 &&
+      toset(keys(aws_route.private_zonal)) == toset(["app_a"]) &&
+      toset(keys(aws_nat_gateway.zonal)) == toset(["ap-northeast-2a"]) &&
+      toset(keys(output.nat_gateway_ids_by_az)) == toset(["ap-northeast-2a"])
+    )
+    error_message = "DB Subnet은 Route Table만 생성하고 NAT 경로와 NAT 대상 AZ에서 제외해야 합니다."
+  }
+}
+
+run "isolated_db_excluded_from_regional_nat" {
+  command = plan
+
+  variables {
+    nat_gateway_mode = "regional"
+    private_subnets = {
+      app_a = { availability_zone = "ap-northeast-2a", cidr_block = "10.10.10.0/24" }
+      db_c  = { availability_zone = "ap-northeast-2c", cidr_block = "10.10.21.0/24", enable_nat_route = false }
+    }
+  }
+
+  assert {
+    condition = (
+      toset(keys(aws_route.private_regional)) == toset(["app_a"]) &&
+      toset(keys(output.nat_gateway_ids_by_az)) == toset(["ap-northeast-2a"])
+    )
+    error_message = "Regional NAT도 인터넷 경로를 사용하지 않는 DB Subnet을 제외해야 합니다."
+  }
+}
+
+run "all_subnets_isolated" {
+  command = plan
+
+  variables {
+    nat_gateway_mode = "zonal"
+    private_subnets = {
+      db_a = { availability_zone = "ap-northeast-2a", cidr_block = "10.10.20.0/24", enable_nat_route = false }
+      db_c = { availability_zone = "ap-northeast-2c", cidr_block = "10.10.21.0/24", enable_nat_route = false }
+    }
+  }
+
+  assert {
+    condition = (
+      length(aws_route_table.private) == 2 &&
+      length(aws_nat_gateway.zonal) == 0 &&
+      length(aws_route.private_zonal) == 0
+    )
+    error_message = "NAT 경로 대상이 없으면 Zonal NAT와 인터넷 기본 경로를 생성하지 않아야 합니다."
+  }
+}
+
 run "rejects_unknown_zonal_subnet" {
   command = plan
 

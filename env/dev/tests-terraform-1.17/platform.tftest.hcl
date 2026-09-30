@@ -1,0 +1,201 @@
+mock_provider "aws" {
+  override_during = plan
+  mock_data "aws_caller_identity" {
+    defaults = { account_id = "123456789012" }
+  }
+  mock_data "aws_partition" {
+    defaults = { partition = "aws" }
+  }
+  mock_data "aws_region" {
+    defaults = { region = "ap-northeast-2" }
+  }
+  mock_data "aws_ec2_managed_prefix_list" {
+    defaults = { id = "pl-cloudfront" }
+  }
+  mock_resource "aws_vpc" {
+    defaults = { id = "vpc-platform" }
+  }
+  mock_resource "aws_s3_bucket" {
+    defaults = {
+      id                          = "sbh-platform-dev-frontend-123456789012"
+      arn                         = "arn:aws:s3:::sbh-platform-dev-frontend-123456789012"
+      bucket_regional_domain_name = "sbh-platform-dev-frontend-123456789012.s3.ap-northeast-2.amazonaws.com"
+    }
+  }
+  mock_resource "aws_ecr_repository" {
+    defaults = {
+      arn            = "arn:aws:ecr:ap-northeast-2:123456789012:repository/sbh-platform-dev/backend"
+      repository_url = "123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/sbh-platform-dev/backend"
+    }
+  }
+  mock_resource "aws_iam_policy" {
+    defaults = { arn = "arn:aws:iam::123456789012:policy/sbh-platform-dev-ecs-execution" }
+  }
+  mock_resource "aws_ecs_cluster" {
+    defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:cluster/sbh-platform-dev-backend" }
+  }
+  mock_resource "aws_ecs_task_definition" {
+    defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:task-definition/sbh-platform-dev-backend:1" }
+  }
+  mock_resource "aws_cloudfront_function" {
+    defaults = { arn = "arn:aws:cloudfront::123456789012:function/sbh-platform-dev-spa" }
+  }
+  mock_resource "aws_cloudfront_distribution" {
+    defaults = {
+      arn         = "arn:aws:cloudfront::123456789012:distribution/ETESTPLATFORM"
+      domain_name = "test-platform.cloudfront.net"
+    }
+  }
+  mock_resource "aws_db_instance" {
+    defaults = {
+      address = "platform-postgres.internal"
+      master_user_secret = [{
+        secret_arn    = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:rds-master-AbCdEf"
+        secret_status = "active"
+        kms_key_id    = "arn:aws:kms:ap-northeast-2:123456789012:key/12345678-1234-1234-1234-123456789012"
+      }]
+    }
+  }
+  mock_resource "aws_secretsmanager_secret" {
+    defaults = { arn = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:sbh-platform-dev/database/app-AbCdEf" }
+  }
+}
+
+mock_provider "random" {
+  override_during = plan
+}
+
+override_resource {
+  target          = module.network.aws_subnet.public["public_a"]
+  override_during = plan
+  values          = { id = "subnet-public-a" }
+}
+override_resource {
+  target          = module.network.aws_subnet.public["public_c"]
+  override_during = plan
+  values          = { id = "subnet-public-c" }
+}
+override_resource {
+  target          = module.network.aws_subnet.private["app_a"]
+  override_during = plan
+  values          = { id = "subnet-app-a" }
+}
+override_resource {
+  target          = module.network.aws_subnet.private["app_c"]
+  override_during = plan
+  values          = { id = "subnet-app-c" }
+}
+override_resource {
+  target          = module.network.aws_subnet.private["db_a"]
+  override_during = plan
+  values          = { id = "subnet-db-a" }
+}
+override_resource {
+  target          = module.network.aws_subnet.private["db_c"]
+  override_during = plan
+  values          = { id = "subnet-db-c" }
+}
+override_resource {
+  target          = module.network.aws_nat_gateway.zonal["ap-northeast-2a"]
+  override_during = plan
+  values          = { id = "nat-app-a" }
+}
+override_resource {
+  target          = module.network.aws_nat_gateway.zonal["ap-northeast-2c"]
+  override_during = plan
+  values          = { id = "nat-app-c" }
+}
+override_resource {
+  target          = module.alb_security_group.aws_security_group.this
+  override_during = plan
+  values          = { id = "sg-alb" }
+}
+override_resource {
+  target          = module.ecs_security_group.aws_security_group.this
+  override_during = plan
+  values          = { id = "sg-ecs" }
+}
+override_resource {
+  target          = module.db_security_group.aws_security_group.this
+  override_during = plan
+  values          = { id = "sg-db" }
+}
+override_resource {
+  target          = module.execution_role.aws_iam_role.this
+  override_during = plan
+  values          = { arn = "arn:aws:iam::123456789012:role/sbh-platform-dev-ecs-execution" }
+}
+override_resource {
+  target          = module.task_role.aws_iam_role.this
+  override_during = plan
+  values          = { arn = "arn:aws:iam::123456789012:role/sbh-platform-dev-ecs-task" }
+}
+override_resource {
+  target          = module.alb.aws_lb.this
+  override_during = plan
+  values = {
+    arn      = "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/sbh-platform-dev-alb/1234567890123456"
+    dns_name = "internal-platform.ap-northeast-2.elb.amazonaws.com"
+  }
+}
+override_resource {
+  target          = module.alb.aws_lb_target_group.this["api"]
+  override_during = plan
+  values          = { arn = "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup/sbh-platform-dev-api/1234567890123456" }
+}
+
+run "infrastructure_only" {
+  command = plan
+
+  assert {
+    condition = (
+      length(output.network.public_subnet_ids) == 2 &&
+      output.network.app_subnet_ids == ["subnet-app-a", "subnet-app-c"] &&
+      output.network.db_subnet_ids == ["subnet-db-a", "subnet-db-c"] &&
+      length(output.network.nat_gateway_ids) == 2 &&
+      output.backend.service_name == null && output.backend.task_definition_arn == null &&
+      aws_secretsmanager_secret.app_database.arn != output.database.master_secret_arn
+    )
+    error_message = "3계층 Subnet, NAT 2개, 초기 서비스 생략과 관리자/앱 Secret 분리가 필요합니다."
+  }
+
+  assert {
+    condition = (
+      aws_vpc_security_group_ingress_rule.cloudfront_to_alb.prefix_list_id == "pl-cloudfront" &&
+      aws_vpc_security_group_ingress_rule.cloudfront_to_alb.from_port == 80 &&
+      aws_vpc_security_group_ingress_rule.alb_to_ecs.referenced_security_group_id == "sg-alb" &&
+      aws_vpc_security_group_ingress_rule.alb_to_ecs.from_port == 8080 &&
+      aws_vpc_security_group_ingress_rule.ecs_to_db.referenced_security_group_id == "sg-ecs" &&
+      aws_vpc_security_group_ingress_rule.ecs_to_db.from_port == 5432 &&
+      aws_vpc_security_group_egress_rule.ecs_https.from_port == 443 &&
+      aws_vpc_security_group_egress_rule.ecs_https.to_port == 443 &&
+      output.backend.execution_role_arn != output.backend.task_role_arn &&
+      jsondecode(aws_s3_bucket_policy.frontend.policy).Statement[0].Condition.StringEquals["AWS:SourceArn"] == module.cloudfront.distribution_arn
+    )
+    error_message = "CloudFront -> ALB -> ECS -> RDS 접근 제한, HTTPS 송신과 S3 배포 ARN 제한을 확인해야 합니다."
+  }
+}
+
+run "activate_two_tasks" {
+  command = plan
+  variables {
+    backend_image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    container_port       = 9090
+    health_check_path    = "/api/ready"
+  }
+  assert {
+    condition = (
+      output.backend.service_name == "sbh-platform-dev-backend" &&
+      output.backend.task_definition_arn != null &&
+      aws_vpc_security_group_ingress_rule.alb_to_ecs.from_port == 9090 &&
+      aws_vpc_security_group_egress_rule.alb_to_ecs.to_port == 9090
+    )
+    error_message = "Digest 지정 시 Service를 활성화하고 앱 포트 변경을 연결해야 합니다."
+  }
+}
+
+run "reject_tag_instead_of_digest" {
+  command = plan
+  variables { backend_image_digest = "latest" }
+  expect_failures = [var.backend_image_digest]
+}
