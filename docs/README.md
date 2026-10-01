@@ -1,8 +1,10 @@
-# Project overview
+# 프로젝트 문서와 작업 기록
 
 마지막 확인일: 2026-10-01
 
-이 저장소는 환경별 Terraform 실행기와 재사용 가능한 AWS Terraform 모듈을 제공합니다. `env/dev`에 ECS와 PostgreSQL Multi-AZ Root Module을 구현했습니다. Unit 9의 46개 생성 Plan은 당시 기록입니다. 2026-10-01 사용자 도메인 작업의 Apply 이후 S3 State는 serial 9, 관리 리소스 인스턴스 48개입니다. 기존 인프라를 처음 생성한 Apply 명령과 애플리케이션 배포 여부는 이번 조회로 확인하지 못했습니다. `env/stg`와 `env/prd`는 아직 Root Module이 없습니다.
+이 저장소는 Team Freesia 서비스의 환경별 AWS 플랫폼 인프라를 관리합니다. `env/dev`에 ECS와 PostgreSQL Multi-AZ Root Module을 구현했으며, `modules/`는 환경 구성에 사용하는 공통 구성 요소입니다. 프로젝트 소개, 아키텍처와 실행 방법은 [루트 README](../README.md)에, 이 문서에는 진행 상태와 작업 이력을 정리합니다.
+
+Unit 9의 46개 생성 Plan은 당시 기록입니다. 2026-10-01 사용자 도메인 작업의 Apply 이후 S3 State는 serial 9, 관리 리소스 인스턴스 48개입니다. 기존 인프라를 처음 생성한 Apply 명령과 애플리케이션 배포 여부는 해당 조회로 확인하지 못했습니다. `env/stg`와 `env/prd`는 아직 Root Module이 없습니다.
 
 ## 새 세션에서 확인할 순서
 
@@ -40,7 +42,7 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 
 ## 진행 현황
 
-아래 검증과 Plan 수치는 각 Unit을 완료한 시점의 기록입니다. 현재 dev Backend State에는 관리 리소스 인스턴스 48개가 있으며 실제 리소스별 상태와 드리프트는 새 Plan으로 확인해야 합니다.
+아래 검증과 Plan 수치는 각 Unit을 완료한 시점의 기록입니다. 모듈 개발 항목은 기존 구현 이력이며, 현재 작업의 중심은 환경별 인프라 구성과 운영입니다. 현재 dev Backend State에는 관리 리소스 인스턴스 48개가 있으며 실제 리소스별 상태와 드리프트는 새 Plan으로 확인해야 합니다.
 
 | 작업 단위 | 구현 | 로컬 검증 | AWS Plan과 Apply | Git 상태 | 상세 기록 |
 |---|---|---|---|---|---|
@@ -145,7 +147,7 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 - 루트 `tests/` 조사 완료: `iam-composition`은 개별 모듈 테스트에 없는 결합 검증이므로 유지. 현재 Provider에서 mock 테스트가 실행되도록 Provider 요구 선언 추가, `terraform validate`와 mock 테스트 1개 통과. 커밋 `df31fab` 원격 main 확인
 - EKS Unit 1, 2 구현, 로컬 mock Plan 각 16개, Review 완료. Unit 1 public, private API 동시 활성화와 Unit 2 명시적 Add-On, Pod Identity Agent, IAM 연결 검증. 커밋 `15fe220`, `4c6c680` 원격 main 확인. Load Balancer Controller와 Gateway API `HTTPRoute`는 Unit 3, 시작 템플릿과 Spot 선택은 Unit 4 범위. 실제 AWS Plan, Apply 미수행
 
-## README 속성 표 점검
+## README 검증 기록
 
 | 날짜 | 명령 | 결과 |
 |---|---|---|
@@ -154,10 +156,14 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 | 2026-09-24 | `python3` 인라인 점검: Markdown 표 열 개수 대조 | 10개 README 모두 일치 |
 | 2026-09-24 | `git diff --check` | PASS |
 | 2026-09-24 | `rg -n '[[:blank:]]+$' AGENTS.md docs/README.md modules` | 일치 항목 없음, 신규 ECR README 포함 줄 끝 공백 없음 |
+| 2026-10-01 | `python3` 인라인 점검: 루트 README와 이 문서의 상대 링크, 앵커, Shell 예제 구문, dev 코드와 기본값 대조, 금지 문자와 공백 검사 | 상대 링크와 앵커 67개, Shell 예제 4개 구문 검사 통과. dev 설정, 출력 계약과 stg/prd 미구현 상태 일치 |
+| 2026-10-01 | `git diff --check` | 문서 변경의 공백 오류 없음. 이번 작업에서 Terraform 테스트, AWS Plan, Apply와 앱 배포는 수행하지 않음 |
 
 ## 현재 작업과 다음 단계
 
-현재 작업은 [dev CloudFront 사용자 도메인](./ai-dlc/dev-cloudfront-custom-domain.md) 연결입니다. Ideation, Inception과 Unit 10 계획을 승인받아 Terraform 구현, 로컬 검증, ACM `ISSUED`와 기존 배포본 `ECSDZ4JA6Z85U`의 Apply를 완료했습니다. AWS에서는 `Deployed`, 별칭 `sbh.howon.me`, 비내보내기 인증서와 SNI 정책을 확인했고 State의 `frontend.url`도 사용자 도메인입니다. 사용자는 외부에서 정상 접속됐다고 확인했습니다. 이 컴퓨터의 DNS가 도메인을 보안 차단 주소로 바꿔 서비스용 CNAME의 정확한 대상과 응답 코드는 독립 확인하지 못했습니다. 적용 후 Plan의 CloudFront Origin 표현 차이 1건은 추가 적용하지 않았습니다. 후속 요청에 따라 구현 커밋 `637e5bd`를 `main`에 푸시하고 원격 SHA 일치를 확인했습니다.
+프로젝트 소개와 인프라 구성, Terraform 및 CI/CD의 역할, 실행 방법을 [루트 README](../README.md)에 작성했습니다. 기존 모듈 개발 기록은 참고 이력으로 유지하고 다음 작업은 dev 배포와 운영 검증을 중심으로 정리합니다.
+
+최근 인프라 작업인 [dev CloudFront 사용자 도메인](./ai-dlc/dev-cloudfront-custom-domain.md) 연결은 Ideation, Inception과 Unit 10 계획을 승인받아 Terraform 구현, 로컬 검증, ACM `ISSUED`와 기존 배포본 `ECSDZ4JA6Z85U`의 Apply를 완료했습니다. AWS에서는 `Deployed`, 별칭 `sbh.howon.me`, 비내보내기 인증서와 SNI 정책을 확인했고 State의 `frontend.url`도 사용자 도메인입니다. 사용자는 외부에서 정상 접속됐다고 확인했습니다. 이 컴퓨터의 DNS가 도메인을 보안 차단 주소로 바꿔 서비스용 CNAME의 정확한 대상과 응답 코드는 독립 확인하지 못했습니다. 적용 후 Plan의 CloudFront Origin 표현 차이 1건은 추가 적용하지 않았습니다. 후속 요청에 따라 구현 커밋 `637e5bd`를 `main`에 푸시하고 원격 SHA 일치를 확인했습니다.
 
 2026-10-01 사용자 도메인 Apply 전 S3 Backend State 조회에서는 관리 리소스 인스턴스 46개와 기존 CloudFront 배포본을 확인했고, 이번 두 단계 Apply 후에는 48개입니다. 아래의 “Apply 미수행” 문구는 각 과거 Unit을 기록한 당시 결과이며 현재 AWS에 리소스가 없다는 뜻은 아닙니다. 기존 인프라 생성 Apply 명령은 확인하지 못했고 애플리케이션 배포 상태도 별도로 검증해야 합니다.
 
@@ -176,5 +182,5 @@ dev Regional NAT와 private-only VPC 전환의 Ideation, Inception과 단일 Uni
 1. ADR의 팀 승인 상태는 별도로 확인합니다.
 2. 사용자 도메인은 AWS 적용과 사용자 접속 확인을 완료했습니다. 서비스용 CNAME 대상과 HTTP 상태 코드의 독립 검증이 필요하면 차단되지 않은 네트워크에서 확인합니다. 적용 후 Origin 블록 표현 차이가 보이는 Plan은 별도 원인 검토 전 추가 적용하지 않습니다.
 3. 앱 이미지, DB 사용자와 `DATABASE_URL` SecureString, 프론트 빌드를 준비한 뒤 CI/CD가 Task Definition과 Service를 배포합니다. 그 전에 마이그레이션 Task를 실행하고, 배포 후 두 AZ 배치와 API/DB 접속을 검증합니다. 배포 주체와 워크플로는 아직 이 저장소에서 구현하지 않았습니다.
-4. EKS의 미완료 Unit 3~5와 stg/prd Root Module은 기존 후속 작업으로 남깁니다. 일반 RDS RR의 모듈 소유 Secret 회전/복구도 별도 운영 작업입니다.
+4. stg/prd 환경 구성은 필요한 요구사항과 적용 범위를 승인받은 뒤 진행합니다.
 5. 계획, 로컬 테스트, AWS Plan, Apply, 배포, 커밋과 푸시를 계속 구분합니다.
