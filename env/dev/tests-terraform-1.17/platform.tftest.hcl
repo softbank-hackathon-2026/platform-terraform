@@ -53,12 +53,24 @@ mock_provider "aws" {
   }
   mock_resource "aws_db_instance" {
     defaults = {
-      address = "platform-postgres.internal"
-      master_user_secret = [{
-        secret_arn    = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:rds-master-AbCdEf"
-        secret_status = "active"
-        kms_key_id    = "arn:aws:kms:ap-northeast-2:123456789012:key/12345678-1234-1234-1234-123456789012"
-      }]
+      address            = "platform-postgres.internal"
+      master_user_secret = []
+    }
+  }
+  mock_resource "aws_secretsmanager_secret" {
+    defaults = {
+      id  = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:sbh-platform-dev-rds-postgres-master-AbCdEf"
+      arn = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:sbh-platform-dev-rds-postgres-master-AbCdEf"
+    }
+  }
+  mock_resource "aws_secretsmanager_secret_version" {
+    defaults = {
+      version_id = "11111111-2222-3333-4444-555555555555"
+    }
+  }
+  mock_ephemeral "aws_secretsmanager_secret_version" {
+    defaults = {
+      secret_string = jsonencode({ username = "dbadmin", password = "MockOnly_1!" })
     }
   }
 }
@@ -81,6 +93,9 @@ mock_provider "aws" {
 
 mock_provider "random" {
   override_during = plan
+  mock_ephemeral "random_password" {
+    defaults = { result = "MockOnly_1!" }
+  }
 }
 
 override_resource {
@@ -165,7 +180,7 @@ run "infrastructure_only" {
       output.backend.container_name == "app" && output.backend.container_port == 8000 &&
       output.database.database_url_parameter_arn == "arn:aws:ssm:ap-northeast-2:123456789012:parameter/sbh/platform/demo/backend/DATABASE_URL" &&
       output.database.database_url_parameter_arn == aws_ssm_parameter.database_url.arn &&
-      output.database.master_secret_arn != null &&
+      output.database.master_secret_arn == "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:sbh-platform-dev-rds-postgres-master-AbCdEf" &&
       output.frontend.url == "https://sbh.howon.me" &&
       module.cloudfront.domain_name == "test-platform.cloudfront.net" &&
       module.cloudfront.url == "https://sbh.howon.me"

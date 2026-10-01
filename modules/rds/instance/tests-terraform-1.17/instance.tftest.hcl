@@ -1,6 +1,10 @@
 mock_provider "aws" {
   override_during = plan
 
+  mock_resource "aws_secretsmanager_secret_version" {
+    defaults = { version_id = "11111111-2222-3333-4444-555555555555" }
+  }
+
   mock_ephemeral "aws_secretsmanager_secret_version" {
     defaults = {
       secret_string = "{\"username\":\"dbadmin\",\"password\":\"test-only-password\"}"
@@ -113,7 +117,9 @@ run "replicas_multi_az_and_iam" {
       aws_secretsmanager_secret.master[0].kms_key_id == var.secret_kms_key_id &&
       aws_secretsmanager_secret.master[0].name == "sample-db-master" &&
       length(aws_secretsmanager_secret_version.master) == 1 &&
-      aws_secretsmanager_secret_version.master[0].secret_string_wo_version == parseint(substr(sha256(var.master_username), 0, 15), 16) &&
+      aws_secretsmanager_secret_version.master[0].secret_string_wo_version == parseint(substr(sha256(var.master_username), 0, 13), 16) &&
+      aws_secretsmanager_secret_version.master[0].secret_string_wo_version < 9007199254740992 &&
+      aws_db_instance.primary.password_wo_version < 9007199254740992 &&
       length(aws_db_instance.replica) == 2 &&
       aws_db_instance.replica["reporting"].instance_class == "db.t4g.medium" &&
       aws_db_instance.replica["reporting"].deletion_protection &&
@@ -164,8 +170,8 @@ run "module_secret_tracks_master_username" {
   assert {
     condition = (
       aws_db_instance.primary.username == "otheradmin" &&
-      aws_secretsmanager_secret_version.master[0].secret_string_wo_version == parseint(substr(sha256("otheradmin"), 0, 15), 16) &&
-      aws_secretsmanager_secret_version.master[0].secret_string_wo_version != parseint(substr(sha256("dbadmin"), 0, 15), 16)
+      aws_secretsmanager_secret_version.master[0].secret_string_wo_version == parseint(substr(sha256("otheradmin"), 0, 13), 16) &&
+      aws_secretsmanager_secret_version.master[0].secret_string_wo_version != parseint(substr(sha256("dbadmin"), 0, 13), 16)
     )
     error_message = "관리자 사용자 이름이 바뀌면 Secret Version 갱신도 계획돼야 합니다."
   }

@@ -41,6 +41,8 @@ CI/CD는 Terraform의 `network`, `frontend`, `backend`, `database` 출력을 배
 
 DB 접속 정보는 `/sbh/platform/demo/backend/DATABASE_URL`의 SSM SecureString으로 준비하고 Task Definition의 Secret 참조로 주입합니다. Terraform은 초기값 `NOT_CONFIGURED`로 Parameter 리소스를 생성하고 ARN과 읽기 권한을 제공합니다. 운영자는 배포 전에 실제 접속값으로 갱신합니다. Terraform은 생성 이후 값과 관련 메타데이터 변경을 무시하고 태그만 관리하며, `value_wo`를 사용해 실제 값을 Plan과 State에 저장하지 않습니다. 현재 AWS Provider는 refresh 시 값을 복호화해 읽으므로 Terraform이 값을 전혀 조회하지 않는 구조는 아닙니다.
 
+dev RDS 관리자 암호는 `module_managed_secret` 모드로 구성합니다. Terraform이 별도 관리자 Secret과 초기 암호를 생성하고 DB에 같은 암호를 설정하며 RDS 관리형 자동 회전은 사용하지 않습니다. 콘솔 수동 변경 시 RDS 비밀번호와 Secret 값을 함께 갱신해야 합니다. 관리자 Secret은 앱 `DATABASE_URL`과 별개입니다. 실제 적용 상태는 [Unit 12 기록](docs/ai-dlc/dev-rds-password-management.md), 변경 절차는 [Runbook](docs/runbooks/ecs-postgresql-platform.md#rds-관리자-비밀번호)을 참고합니다.
+
 배포 입력과 순서는 [dev README](env/dev/README.md)와 [운영 Runbook](docs/runbooks/ecs-postgresql-platform.md)에서 확인합니다.
 
 ## 환경과 적용 기록

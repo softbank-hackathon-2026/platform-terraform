@@ -115,7 +115,7 @@ module "database" {
   subnet_ids              = local.db_subnet_ids
   security_group_ids      = [module.db_security_group.security_group_id]
   master_username         = "dbadmin"
-  master_password_mode    = "rds_managed"
+  master_password_mode    = "module_managed_secret"
   multi_az                = true
   read_replicas           = {}
   backup_retention_period = 7

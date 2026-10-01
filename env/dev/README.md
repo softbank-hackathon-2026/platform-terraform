@@ -25,6 +25,8 @@ Public Subnet과 Public Route Table은 만들지 않아요. Regional NAT는 VPC�
 
 DB는 PostgreSQL 17.11, db.t4g.small, gp3 20 GiB예요. 자동 장애 전환용 Primary와 Standby를 구성하고 읽기 복제본은 만들지 않아요. 암호화, 7일 백업, 삭제 보호와 최종 스냅샷을 사용해요. 백엔드는 `DATABASE_URL` 환경변수 하나로 접속하며 Task Definition의 Secret 참조로 주입해요.
 
+dev 관리자 암호는 `module_managed_secret` 모드로 구성해요. Terraform이 `sbh-platform-dev-rds-postgres-master` Secret과 초기 Version을 만들고, 같은 암호를 기존 DB에 write-only 인수로 전달해요. RDS 관리형 자동 회전은 사용하지 않아요. 콘솔에서는 RDS 관리자 비밀번호와 Secret의 `password`를 같은 값으로 함께 변경해야 해요. 적용 및 검증 상태는 [Unit 12 기록](../../docs/ai-dlc/dev-rds-password-management.md), 변경 절차와 Terraform의 특정 Version 참조 제한은 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md#rds-관리자-비밀번호)에 정리해요.
+
 CI/CD는 이 인프라가 준비된 후 이미지 Digest로 Fargate Task Definition revision을 등록하고, 필요한 마이그레이션을 실행한 뒤 ECS Service를 생성하거나 새 revision으로 갱신해요. 서비스가 아직 없으면 ALB Target이 비어 있어 `/api`가 503을 반환할 수 있어요. [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)에 배포 입력 계약을 정리했어요.
 
 ## 입력 속성
@@ -47,7 +49,7 @@ SSM Parameter의 실제 이름은 기존 배포 계약인 `/sbh/platform/demo/ba
 
 AWS Provider의 `default_tags`와 각 모듈의 `tags`에 `Project=SBH`, `Scope=platform`, `Environment=dev`, `ManagedBy=terraform`, `Owner=정호원`을 적용해요. 태그를 지원하는 각 리소스의 `Name`은 리소스 이름이나 역할에 맞춰 별도로 설정해요. 공유 리소스에 특정 앱이나 배포의 `ApplicationId`, `DeploymentId`는 넣지 않아요. `InfraId`는 시스템의 실제 식별자가 정해지면 추가할 수 있어요.
 
-CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가 허용하는 이름으로 식별해요. RDS 관리형 관리자 Secret과 CloudFront VPC Origin의 하위 리소스 등 AWS가 생성하는 리소스의 태그는 Apply 이후 별도로 확인해야 해요. Terraform Plan은 이 확인을 대신하지 않아요.
+CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가 허용하는 이름으로 식별해요. dev 관리자 Secret은 모듈이 공통 태그를 붙여 관리해요. CloudFront VPC Origin의 하위 리소스 등 AWS가 생성하는 리소스의 태그는 Apply 이후 별도로 확인해야 해요. Terraform Plan은 이 확인을 대신하지 않아요.
 
 ## 출력 속성
 
@@ -84,7 +86,7 @@ CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가
 | `database` | `address` | Primary 접속 DNS예요. |
 | `database` | `port` | TCP 5432예요. |
 | `database` | `name` | DB 이름이에요. |
-| `database` | `master_secret_arn` | RDS 관리형 관리자 Secret ARN이에요. |
+| `database` | `master_secret_arn` | 모듈이 생성하는 비관리형 관리자 Secret ARN이에요. |
 | `database` | `database_url_parameter_arn` | Terraform이 초기값으로 생성하는 SSM Parameter ARN이에요. 실제 접속값은 운영 경로에서 갱신해요. |
 
 ## DATABASE_URL 준비
@@ -113,6 +115,8 @@ Terraform Plan은 잠금 파일을 잠시 생성하고 삭제할 수 있어요. 
 2026-10-01 사용자 도메인 Apply 후 S3 Backend State에는 관리 리소스 인스턴스 48개가 있었고, Unit 11 Parameter 생성 Apply 후에는 serial 10, 49개예요. 아래의 초기 구축 Plan은 그 전 시점 기록이에요. ACM 인증서 발급과 기존 CloudFront 배포본의 별칭 및 인증서 적용은 끝났고, 사용자는 외부 접속이 정상이라고 확인했어요. 현재 컴퓨터에서는 보안 DNS 차단 때문에 HTTPS 응답 코드를 직접 확인할 수 없었어요. [별도 AI-DLC 기록](../../docs/ai-dlc/dev-cloudfront-custom-domain.md)을 확인해요.
 
 2026-10-01 Unit 11의 SSM 대상 지정 Plan 1 add / 0 change / 0 destroy를 승인받아 Apply했고 Parameter 하나를 생성했어요. AWS 메타데이터는 SecureString, Standard, `alias/aws/ssm`, 버전 1이에요. State의 값 비저장과 ARN 및 IAM 계약도 확인했어요. 적용 후 전체 Plan은 0 add / 1 change / 0 destroy로 Parameter 추가 변경이 없고 기존 CloudFront Origin 표현 차이만 남아요. Terraform 1.16.4로 수행했으며 실제 접속값 갱신과 DB 연결은 아직 검증하지 않았어요. [Unit 11 검증 기록](../../docs/ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-리소스-생성)에 명령과 결과를 정리했어요.
+
+2026-10-01 Unit 12의 비관리형 전환과 버전 정밀도 수정 Apply를 완료했어요. 기존 DB와 접속 주소 및 Secret 컨테이너를 유지했고 현재 DB는 `available`이에요. 모듈 mock 16개, dev mock 4개, 전체 mock Plan 점검 2개와 fmt 및 validate가 통과했어요. 초기 전환 뒤 반복 교체를 유발한 큰 버전 번호를 52비트로 수정했고 State와 실제 Plan에서 해소를 확인했어요. refresh-only로 새 Secret ARN 출력을 갱신해 최종 State는 serial 15, 관리 인스턴스 51개예요. 전체 Plan은 0 add / 1 change / 0 destroy로 기존 CloudFront 차이만 남아요. 실제 DB 로그인은 미수행이에요. 이번 변경의 커밋 및 푸시는 사용자 후속 요청으로 승인받아 진행해요.
 
 ## 로컬 검증
 

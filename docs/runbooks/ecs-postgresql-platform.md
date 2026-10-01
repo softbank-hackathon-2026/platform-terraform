@@ -2,7 +2,7 @@
 
 작성일: 2026-10-01
 
-이 문서는 인프라와 앱 배포 절차예요. 2026-10-01 Unit 11 Parameter 생성 Apply 후 S3 Backend State는 serial 10, 관리 리소스 인스턴스 49개예요. 최신 전체 Plan에는 기존 CloudFront Origin 표현 차이 변경 1개만 남고 Parameter는 추가 변경이 없어요. 실제 리소스 상태는 새 Plan과 서비스 조회로 다시 확인하세요. 기존 구현과 Parameter 생성 검증은 [Platform AI-DLC](../ai-dlc/ecs-postgresql-platform.md), 사용자 도메인 작업은 [CloudFront AI-DLC](../ai-dlc/dev-cloudfront-custom-domain.md)에 기록해요.
+이 문서는 인프라와 앱 배포 절차예요. 2026-10-01 Unit 12 관리자 암호 전환과 출력 refresh-only 적용 후 S3 Backend State는 serial 15, 관리 리소스 인스턴스 51개예요. 최신 전체 Plan에는 기존 CloudFront Origin 표현 차이 변경 1개만 남고 DB, 관리자 Secret과 Parameter는 추가 변경이 없어요. 실제 리소스 상태는 새 Plan과 서비스 조회로 다시 확인하세요. 기존 구현과 Parameter 생성 검증은 [Platform AI-DLC](../ai-dlc/ecs-postgresql-platform.md), 사용자 도메인 작업은 [CloudFront AI-DLC](../ai-dlc/dev-cloudfront-custom-domain.md)에 기록해요.
 
 ## CloudFront 사용자 도메인
 
@@ -11,6 +11,20 @@
 먼저 현재 State와 전체 Plan을 확인한 뒤 `aws_acm_certificate.frontend`만 대상으로 인증서 요청을 Apply해요. 대상 지정 Apply는 이 초기 발급 단계에만 사용해요. 검증 CNAME과 인증서 상태를 확인한 뒤 전체 Plan을 다시 실행하고, 기존 배포본 변경 외에 예상하지 않은 변경이나 삭제가 없을 때 적용해요. 적용 후 ACM `ISSUED`, CloudFront `Deployed`, 별칭과 인증서 ARN, 공개 DNS CNAME과 `https://sbh.howon.me`의 TLS 및 HTTP 응답을 각각 확인해요.
 
 복구할 때는 먼저 배포본의 별칭과 사용자 인증서를 Terraform으로 제거하고 기본 인증서 배포가 완료됐는지 확인해요. 그 뒤 필요하면 Cloudflare 서비스용 CNAME을 정리하고 ACM 인증서를 제거해요. CloudFront에 연결된 인증서는 먼저 삭제하지 않아요.
+
+## RDS 관리자 비밀번호
+
+dev는 `master_password_mode = "module_managed_secret"`를 사용해요. 관리자 Secret 이름은 `sbh-platform-dev-rds-postgres-master`이고 JSON에 `username`, `password`가 있어요. 초기 전환은 기존 RDS를 수정하고 이전 RDS 관리형 Secret을 삭제하므로 기존 Secret ARN을 계속 사용하지 마세요. 현재 ARN은 Terraform의 `database.master_secret_arn` 출력에서 확인해요. 적용 상태는 [Unit 12 기록](../ai-dlc/dev-rds-password-management.md)에 남겨요.
+
+자동 회전과 DB 및 Secret 자동 동기화는 설정하지 않아요. 원하는 암호로 수동 변경할 때는 다음 순서를 따라요.
+
+1. RDS 콘솔에서 `sbh-platform-dev-rds-postgres`를 선택하고 수정 화면의 관리자 비밀번호를 변경해요. 관리형 암호가 해제됐는지 확인하고 다른 대기 변경이 함께 적용되는지도 검토해요.
+2. RDS 변경 상태를 확인한 뒤 Secrets Manager 콘솔에서 `sbh-platform-dev-rds-postgres-master`의 시크릿 값을 편집해 `password`를 같은 값으로 설정해요. `username`은 `dbadmin`으로 유지해요.
+3. 기존 VPC 내부 관리 경로에서 새 비밀번호로 접속을 확인해요. Secret만 수정하면 실제 DB 비밀번호는 바뀌지 않아요. 관리자 암호를 앱 Parameter에 복사하지 않아요.
+
+Terraform은 최초 생성한 특정 Secret Version을 조회해요. 콘솔에서 새 Version으로 만든 `AWSCURRENT`를 자동으로 따라가지 않아요. 보통 Plan에서 write-only 버전이 바뀌지 않으면 암호를 다시 설정하지 않지만, DB 교체나 모듈의 Secret Version 변경 시 초기 암호가 재사용될 수 있어요. 수동 변경 이후 이런 Plan은 현재 암호 소유 방식을 확인한 뒤 적용해요. [Secret 값 수정](https://docs.aws.amazon.com/secretsmanager/latest/userguide/manage_update-secret-value.html), [RDS 암호 수정](https://docs.aws.amazon.com/cli/latest/reference/rds/modify-db-instance.html)
+
+전환 실패 시 새 Secret을 먼저 삭제하지 않아요. RDS 관리형 연결, 대기 변경과 State를 확인하고 기존 DB를 유지한 채 복구해요. RDS 관리형으로 되돌릴 때는 별도 Plan으로 새 관리형 Secret 발급과 기존 모듈 소유 Secret 제거를 검토해요. 이전 암호와 이전 Secret ARN은 자동 복원되지 않아요.
 
 ## 배포 순서
 

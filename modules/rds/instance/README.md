@@ -90,11 +90,13 @@ read_replicas = {
 
 ## 관리자 암호와 일반 DB 사용자 IAM 접속
 
+Secret과 DB의 write-only 버전 번호는 해시 앞 13자리로 만든 52비트 정수입니다. Provider와 State의 숫자 변환에서 정밀도를 유지해 변경 없는 Plan이 Secret Version을 반복 교체하지 않도록 합니다. 이전 60비트 번호를 사용한 배포본에서는 새 Version과 DB 암호 갱신이 한 번 계획되므로 실제 Plan에서 DB와 Secret 컨테이너가 유지되는지 확인하세요.
+
 기본 `rds_managed` 모드에서는 RDS가 관리자 암호를 생성하고 Secrets Manager에서 관리합니다. RDS 관리형 Secret은 기본적으로 자동 회전됩니다. RR을 만들 수 없으므로 `read_replicas`는 비워야 합니다.
 
-`module_managed_secret` 모드에서는 모듈이 `<identifier>-master` Secret을 만들고 최초 암호를 저장합니다. Secret 값은 `username`과 `password`를 담은 JSON입니다. 암호는 Terraform의 ephemeral 값과 write-only 인수로 전달하므로 모듈 입력·출력, Plan·State에 평문으로 저장하지 않습니다. 기본 DB는 Secret의 해당 버전을 읽어 같은 암호로 생성되고 복제본은 원본을 복제합니다. `secret_kms_key_id`로 두 방식 모두 기존 KMS 키를 지정할 수 있습니다. Secret 조회에는 `secretsmanager:GetSecretValue`와 선택한 KMS 키의 복호화 권한이 필요합니다.
+`module_managed_secret` 모드에서는 모듈이 `<identifier>-master` Secret을 만들고 최초 암호를 저장합니다. Secret 값은 `username`과 `password`를 담은 JSON입니다. 암호는 Terraform의 ephemeral 값과 write-only 인수로 전달하므로 모듈 입력 및 출력, Plan 및 State에 평문으로 저장하지 않습니다. 기본 DB는 Secret의 해당 버전을 읽어 같은 암호로 생성되고 복제본은 원본을 복제합니다. `secret_kms_key_id`로 두 방식 모두 기존 KMS 키를 지정할 수 있습니다. Secret 조회에는 `secretsmanager:GetSecretValue`와 선택한 KMS 키의 복호화 권한이 필요합니다.
 
-모듈 소유 Secret의 자동 회전은 설정하지 않습니다. Secret 값만 외부에서 바꾸면 DB 암호와 달라질 수 있고, Secret 버전 교체와 DB 암호 변경은 원자적이지 않습니다. `master_username` 변경은 Secret 갱신과 DB 교체를 수반하므로 적용 전에 별도로 검토하세요. 운영 전 별도의 회전·복구 절차를 준비하세요. 이미 배포된 DB의 모드 전환도 이 모듈의 검증 범위가 아닙니다. 관리자는 IAM 로그인 대상으로 구성하지 않습니다.
+모듈 소유 Secret의 자동 회전은 설정하지 않습니다. Secret 값만 외부에서 바꾸면 DB 암호와 달라질 수 있고, Secret 버전 교체와 DB 암호 변경은 원자적이지 않습니다. 모듈은 직접 생성한 특정 Secret Version을 조회하므로 콘솔에서 만든 새 `AWSCURRENT` 값을 자동으로 따라가지 않습니다. 수동 변경은 RDS와 Secret을 함께 수정해야 하며 이후 DB 교체나 Version 변경 Plan에서는 초기 암호 재사용 여부를 확인해야 합니다. `master_username` 변경은 Secret 갱신과 DB 교체를 수반하므로 적용 전에 별도로 검토하세요. 운영 전 별도의 회전 및 복구 절차를 준비하세요. 이미 배포된 DB의 모드 전환은 엔진과 공급자별 실제 검증이 필요하며 dev PostgreSQL의 전환 상태는 [Unit 12 기록](../../../docs/ai-dlc/dev-rds-password-management.md)을 참고합니다. 관리자는 IAM 로그인 대상으로 구성하지 않습니다.
 
 로컬 mock 테스트는 Terraform 1.17 beta 이상에서 `terraform test -test-directory=tests-terraform-1.17`로 실행합니다. 테스트 파일을 별도 디렉터리에 둬 Terraform 1.11~1.16의 일반 `terraform validate`와 모듈 사용은 유지합니다.
 
@@ -154,4 +156,4 @@ IAM 주체에 이 정책을 연결한 뒤, 해당 DB 주소와 포트 및 DB 사
 
 `module_managed_secret`에서 모듈을 제거하면 Secret은 공급자 기본값에 따라 [30일 복구 대기 기간](https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/secretsmanager_secret)을 거쳐 삭제됩니다. 이 기간에 같은 `<identifier>-master` 이름으로 바로 다시 만들 수 없으므로 재생성 전에 Secret 삭제 상태를 확인하세요.
 
-이 모듈은 실제 AWS 생성, Secret 값과 DB 암호의 일치, 백업 복구, 복제 지연 또는 IAM 로그인 성공을 검증하지 않았습니다. 비용과 지원 엔진 버전·클래스는 Apply 전에 확인하세요.
+이 모듈은 실제 AWS 생성, Secret 값과 DB 암호의 일치, 백업 복구, 복제 지연 또는 IAM 로그인 성공을 검증하지 않았습니다. 비용과 지원 엔진 버전 및 클래스는 Apply 전에 확인하세요.

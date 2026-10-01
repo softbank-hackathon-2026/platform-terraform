@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Check dev infrastructure and CI/CD handoff in mock plans."""
 
+import hashlib
 import json
 import re
 import sys
@@ -32,7 +33,7 @@ def check_plan(plan, port, health_path):
         "aws_iam_role", "aws_iam_policy",
         "aws_ecr_repository", "aws_s3_bucket",
         "aws_cloudfront_distribution", "aws_cloudfront_vpc_origin", "aws_cloudfront_function",
-        "aws_acm_certificate", "aws_ssm_parameter",
+        "aws_acm_certificate", "aws_ssm_parameter", "aws_secretsmanager_secret",
     }
     required_tags = {
         "Project": "SBH", "Scope": "platform", "Environment": "dev",
@@ -44,6 +45,7 @@ def check_plan(plan, port, health_path):
         "aws_ecs_cluster": "name", "aws_cloudwatch_log_group": "name",
         "aws_cloudfront_function": "name",
         "aws_db_instance": "identifier", "aws_db_subnet_group": "name", "aws_s3_bucket": "bucket",
+        "aws_secretsmanager_secret": "name",
     }
     for resource in resources.values():
         if resource["type"] not in taggable:
@@ -85,13 +87,23 @@ def check_plan(plan, port, health_path):
         "multi_az": True, "storage_type": "gp3", "allocated_storage": 20,
         "storage_encrypted": True, "publicly_accessible": False,
         "backup_retention_period": 7, "deletion_protection": True,
-        "skip_final_snapshot": False, "manage_master_user_password": True,
+        "skip_final_snapshot": False, "manage_master_user_password": None,
         "copy_tags_to_snapshot": True,
     }.items():
         require(db.get(key) == value, f"RDS {key} mismatch")
     require(db.get("password") is None and db.get("password_wo") is None, "No DB password may be stored")
     require(attrs("module.database.aws_db_subnet_group.this")["subnet_ids"] == ["subnet-db-a", "subnet-db-c"], "RDS must use DB subnets only")
-    require(not of_type("aws_secretsmanager_secret") and not of_type("aws_secretsmanager_secret_version"), "Terraform must not manage app Secrets Manager credentials")
+    require(len(of_type("aws_secretsmanager_secret")) == 1 and len(of_type("aws_secretsmanager_secret_version")) == 1, "Only the DB administrator Secret and its initial Version may be managed")
+    master_secret = attrs("module.database.aws_secretsmanager_secret.master[0]")
+    master_version = attrs("module.database.aws_secretsmanager_secret_version.master[0]")
+    require(master_secret["name"] == "sbh-platform-dev-rds-postgres-master", "Administrator Secret naming mismatch")
+    require(master_version["secret_id"] == master_secret["id"], "Administrator Version must belong to the managed Secret")
+    require(all(master_version.get(key) is None for key in ["secret_string", "secret_binary", "secret_string_wo"]), "No Secret body may be stored in the plan")
+    require(master_version["secret_string_wo_version"] == int(hashlib.sha256(b"dbadmin").hexdigest()[:13], 16), "Secret bootstrap version must match the administrator username")
+    require(db["password_wo_version"] == int(hashlib.sha256(master_version["version_id"].encode()).hexdigest()[:13], 16), "DB password version must follow the created Secret Version")
+    for counter in [master_version["secret_string_wo_version"], db["password_wo_version"]]:
+        require(0 <= counter < 2**53 and int(float(counter)) == counter, "Write-only versions must survive floating-point numeric conversion exactly")
+    require(not of_type("aws_secretsmanager_secret_rotation"), "Automatic password rotation is outside the approved dev scope")
     require(len(of_type("aws_ssm_parameter")) == 1, "Expected only the DATABASE_URL parameter")
     parameter = attrs("aws_ssm_parameter.database_url")
     require(parameter["name"] == "/sbh/platform/demo/backend/DATABASE_URL", "DATABASE_URL parameter path mismatch")
@@ -160,6 +172,7 @@ def check_plan(plan, port, health_path):
     require(plan["output_changes"]["network"]["after"]["app_subnet_ids"] == ["subnet-app-a", "subnet-app-c"], "App subnet handoff mismatch")
     require(plan["output_changes"]["database"]["after"]["database_url_parameter_arn"] == parameter_arn, "SSM handoff mismatch")
     require(plan["output_changes"]["database"]["after"]["name"] == "freesia", "Database output name must be freesia")
+    require(plan["output_changes"]["database"]["after"]["master_secret_arn"] == master_secret["arn"], "Database output must point to the administrator Secret")
 
 
 def main(path):

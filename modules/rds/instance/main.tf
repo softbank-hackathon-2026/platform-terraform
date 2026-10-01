@@ -2,8 +2,9 @@ locals {
   port                  = var.port == null ? (var.engine == "postgres" ? 5432 : 3306) : var.port
   module_managed_secret = var.master_password_mode == "module_managed_secret"
   master_password       = local.module_managed_secret ? jsondecode(ephemeral.aws_secretsmanager_secret_version.master[0].secret_string).password : null
+  # Keep version counters within 52 bits so SDK/JSON numeric conversions stay exact.
   master_password_version = local.module_managed_secret ? parseint(
-    substr(sha256(aws_secretsmanager_secret_version.master[0].version_id), 0, 15),
+    substr(sha256(aws_secretsmanager_secret_version.master[0].version_id), 0, 13),
     16
   ) : null
 }
@@ -36,7 +37,7 @@ resource "aws_secretsmanager_secret_version" "master" {
     username = var.master_username
     password = ephemeral.random_password.master[0].result
   })
-  secret_string_wo_version = parseint(substr(sha256(var.master_username), 0, 15), 16)
+  secret_string_wo_version = parseint(substr(sha256(var.master_username), 0, 13), 16)
 }
 
 ephemeral "aws_secretsmanager_secret_version" "master" {

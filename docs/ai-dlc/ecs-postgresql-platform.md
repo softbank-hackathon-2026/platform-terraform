@@ -6,13 +6,13 @@
 
 | 구분 | 상태 |
 |---|---|
-| Ideation | 최초 계획과 후속 Unit 5~9 및 11 범위 승인 |
-| Inception | 최초 계획과 후속 Unit 5~9 및 11 요구사항 승인 |
-| Construction | Unit 1~9 및 11 구현과 Review 완료. dev Task Definition과 Service는 CI/CD 소유 |
-| 로컬 검증 | 최신 Unit 11 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 11에서 재실행하지 않음 |
-| 실제 AWS Plan | Unit 11 Apply 전 SSM 대상 지정 1 add / 0 change / 0 destroy. Apply 후 전체 Plan 0 add / 1 change / 0 destroy. SSM 추가 변경 없이 기존 CloudFront Origin 표현 차이만 남음 |
-| Apply와 배포 | Unit 11 Parameter 생성 Apply 완료, 1 added / 0 changed / 0 destroyed. 실제 접속값 등록과 앱 배포 미수행. 사용자 도메인 Unit 10은 별도 기록 참고 |
-| 커밋과 푸시 | Unit 11 구현과 Apply 기록의 커밋 `40d3ddb`을 main에 푸시하고 원격 SHA 일치 확인 |
+| Ideation | 최초 계획과 후속 Unit 5~9, 11 및 12 범위 승인 |
+| Inception | 최초 계획과 후속 Unit 5~9, 11 및 12 요구사항 승인 |
+| Construction | Unit 1~9, 11 및 12 구현과 Apply 전 Review 완료. dev Task Definition과 Service는 CI/CD 소유 |
+| 로컬 검증 | 최신 Unit 12 fmt, dev 및 독립 RDS validate, RDS mock 16개, dev mock 4개와 전체 Plan 점검 2개 통과. SPA는 변경 없어서 재실행하지 않음 |
+| 실제 AWS Plan | Unit 12 최종 0 add / 1 change / 0 destroy. RDS와 관리자 Secret/Version, database 출력 및 Parameter no-op. 기존 CloudFront Origin 표현 차이만 남음 |
+| Apply와 배포 | Unit 11 Parameter 생성 및 Unit 12 비관리형 전환과 정밀도 수정 Apply 완료. 최종 State serial 15, 51개. DB 로그인, 실제 앱 접속값 등록과 앱 배포 미수행 |
+| 커밋과 푸시 | Unit 11은 구현과 기록을 main에 푸시. Unit 12는 사용자 후속 요청으로 커밋 및 푸시 승인, 진행 중 |
 
 초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 Apply는 명시적으로 승인된 해당 Unit 범위에서만 수행합니다.
 
@@ -466,3 +466,9 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 | 2026-10-01 | `git diff --check`, Python 인라인 문서 링크 및 앵커와 금지 문자 검사, `git check-ignore` | 공백 오류와 금지 문자 없음, 링크 및 앵커 80개 확인. 실제 Backend, State와 Plan은 Git 제외 |
 | 2026-10-01 | 변경 파일 9개 `git add`, `git diff --cached --check`, `git diff --cached --name-only`, `git commit -m 'feat: create dev DATABASE_URL parameter resource'` | 검토한 9개 파일만 커밋. 구현 및 Apply 검증 커밋 `40d3ddbc7b1eb41611e4f1a7aa4ae71991a366e7` |
 | 2026-10-01 | `git push origin main`, `git ls-remote origin refs/heads/main`, `git rev-parse HEAD`, `git status --short --branch` | 원격 main과 로컬 HEAD SHA가 `40d3ddbc7b1eb41611e4f1a7aa4ae71991a366e7`로 일치, 구현 푸시 직후 작업 트리 변경 없음 |
+
+## 후속 변경: dev RDS 관리자 비밀번호 비관리형 전환
+
+2026-10-01 사용자가 관리 방식, 기존 DB 유지와 콘솔 수동 변경 방법을 확인한 뒤 `비관리형으로 바꾸고 적용해줘`라고 요청했습니다. Unit 12의 Ideation, Inception, Design, Implementation Plan 및 Apply 승인과 검증 기록은 [별도 AI-DLC](./dev-rds-password-management.md)에 정리합니다. dev는 기존 `module_managed_secret` 모드를 선택하고 관리자 Secret 및 초기 Version을 생성합니다. 기존 RDS 모듈의 입력 계약과 기본값은 바꾸지 않으며 앱 Parameter와 CI/CD 배포 범위도 유지합니다.
+
+fmt, validate, dev mock 4개와 전체 mock Plan 점검 2개가 통과했습니다. 실제 전체 Plan은 2 add / 2 change / 0 destroy이고 기존 CloudFront 차이를 제외한 DB 대상 지정 Plan은 2 add / 1 change / 0 destroy입니다. 기존 RDS의 Resource ID와 주소가 유지되고 암호와 Secret 본문은 Plan에 저장되지 않습니다. 초기 전환은 2 added / 1 changed / 0 destroyed로 완료했습니다. 실제 State에서 60비트 번호 반올림을 발견해 52비트로 수정하고 Secret Version 한 번의 교체 및 기존 DB 암호 갱신을 적용했습니다. 독립 RDS mock 16개도 통과했습니다. DB와 Secret 컨테이너는 유지했고 출력 ARN을 refresh-only로 갱신했습니다. 최종 State는 serial 15, 51개이며 전체 Plan은 0 add / 1 change / 0 destroy로 DB와 Secret 추가 변경 없이 기존 CloudFront 차이만 남습니다. DB 로그인과 앱 배포는 수행하지 않았습니다. 이번 변경의 커밋 및 푸시는 사용자 후속 요청으로 승인받아 진행합니다.

@@ -42,7 +42,7 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 
 ## 진행 현황
 
-아래 검증과 Plan 수치는 각 Unit을 완료한 시점의 기록입니다. 모듈 개발 항목은 기존 구현 이력이며, 현재 작업의 중심은 환경별 인프라 구성과 운영입니다. 현재 dev Backend State에는 관리 리소스 인스턴스 49개가 있으며 최신 전체 Plan에는 기존 CloudFront Origin 표현 차이 변경 1개만 남습니다.
+아래 검증과 Plan 수치는 각 Unit을 완료한 시점의 기록입니다. 모듈 개발 항목은 기존 구현 이력이며, 현재 작업의 중심은 환경별 인프라 구성과 운영입니다. 현재 dev Backend State는 serial 15, 관리 리소스 인스턴스 51개이며 최신 전체 Plan에는 기존 CloudFront Origin 표현 차이 변경 1개만 남습니다. RDS와 관리자 Secret에는 추가 변경이 없습니다.
 
 | 작업 단위 | 구현 | 로컬 검증 | AWS Plan과 Apply | Git 상태 | 상세 기록 |
 |---|---|---|---|---|---|
@@ -59,11 +59,12 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 | KMS 모듈 | Unit 1 구현, Test, Review 완료 | 포맷, 구성 검증 통과, mock 테스트 10개 통과 | 실제 AWS 기준 미수행 | 구현 커밋 `2b1f850` 원격 main 확인 | [KMS AI-DLC](./ai-dlc/kms-module.md) |
 | EKS 및 클러스터 공통 구성 | Unit 1, 2 구현, Test, Review 완료. Unit 3~5 미시작 | 두 Unit 포맷, 구성 검증 통과, 각 mock Plan 16개 통과 | 실제 AWS 기준 미수행 | Unit 1 `15fe220`, Unit 2 `4c6c680` 원격 main 확인 | [EKS AI-DLC](./ai-dlc/eks-module.md) |
 | ECS와 CloudFront 모듈 | 구현과 Review 완료 | ECS mock 6개, CloudFront mock 3개, SPA 14개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
-| 환경별 Root Module | dev ECS/PostgreSQL 기반과 초기값으로 생성하는 `DATABASE_URL` SSM Parameter 구현, Task Definition과 Service는 CI/CD 소유, stg/prd 미구현 | 최신 Unit 11 fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | Unit 11 Apply 1 added / 0 changed / 0 destroyed. 적용 후 전체 Plan 0 add / 1 change / 0 destroy | Unit 11 구현 커밋 `40d3ddb` 원격 main 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
+| 환경별 Root Module | dev 기반 인프라, 초기값 SSM Parameter와 비관리형 관리자 Secret 구현. Task/Service는 CI/CD 소유, stg/prd 미구현 | 최신 Unit 12 fmt, validate, RDS mock 16개, dev mock 4개와 전체 Plan 점검 2개 통과 | Unit 12 전환 및 정밀도 수정 Apply 완료, 최종 DB/Secret no-op 및 기존 CloudFront 1 change | Unit 11 main 반영, Unit 12 커밋 및 푸시 승인, 진행 중 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md), [Unit 12](./ai-dlc/dev-rds-password-management.md) |
 | dev 네이밍과 태깅 | `env/dev`와 연결 모듈에 규칙 반영 | validate, 결합 mock 5개, 전체 Plan 점검 2개, ALB 15개, SG 8개, ECS 6개, IAM Role 5개 통과 | 56 add / 0 change / 0 destroy, 42개 리소스 계획 태그 확인. Apply 미수행 | `main` 커밋 및 원격 SHA 확인 | [네이밍과 태깅 AI-DLC](./ai-dlc/dev-naming-tagging.md) |
 | dev 백엔드 내부 포트 | 기본값 8000 반영. ALB Listener 80 유지 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 변경 후 56 add / 0 change / 0 destroy, Target Group과 ALB/ECS 규칙 8000 확인. Apply 미수행 | `main` 커밋 및 원격 SHA 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-백엔드-내부-포트-8000) |
 | dev Regional NAT와 private-only VPC | Unit 6 구현, Test와 Review 완료 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 47 add / 0 change / 0 destroy, Apply 미수행 | `main` 커밋과 푸시 완료, 원격 SHA 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-regional-nat와-private-only-vpc) |
 | dev `DATABASE_URL` Parameter Store | Unit 7 구현과 Review 완료. 값 등록은 별도 운영 작업 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 46 add / 0 change / 0 destroy, Parameter 미등록, Apply 미수행 | 구현 커밋 `2886bd4` 원격 main 확인 | [Unit 7](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-store-연동) |
+| dev RDS 관리자 비밀번호 비관리형 전환 | Unit 12 구현, 정밀도 수정과 Review 완료 | RDS mock 16개, dev mock 4개, 전체 Plan 점검 2개 및 fmt/validate 통과 | 전환 및 Version 수정 Apply 완료. DB/Secret 컨테이너 유지, 최종 DB/Secret no-op | 커밋 및 푸시 승인, 진행 중 | [Unit 12](./ai-dlc/dev-rds-password-management.md) |
 | dev `DATABASE_URL` Parameter 리소스 생성 | Unit 11 구현, Review와 리소스 생성 완료. 실제 접속값은 운영자가 갱신 | fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 실제 AWS 메타데이터와 State 값 비저장 확인 | SSM만 Apply 1 added / 0 changed / 0 destroyed. 이후 Parameter no-op | 구현 커밋 `40d3ddb` 원격 main 확인 | [Unit 11](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-리소스-생성) |
 | dev ECS 배포 소유 경계 | Unit 8 구현과 Review 완료. Terraform은 기반 인프라, CI/CD는 Task Definition과 Service 소유 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, Task Definition과 Service 없음, Apply 미수행 | 구현 커밋 `2886bd4` 원격 main 확인 | [Unit 8](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-ecs-배포-소유-경계) |
 | dev 초기 DB 이름 `freesia` | Unit 9 구현과 Review 완료 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, RDS 이름 `freesia`, Apply 미수행 | 구현 커밋 `c0df773` 원격 main 확인 | [Unit 9](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia) |
@@ -162,9 +163,11 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ## 현재 작업과 다음 단계
 
+[Unit 12 dev RDS 관리자 비밀번호 관리 방식 전환](./ai-dlc/dev-rds-password-management.md)을 승인받아 구현, 검증과 Apply를 완료했습니다. 기존 DB와 접속 주소를 유지하면서 RDS 관리형을 해제하고 `sbh-platform-dev-rds-postgres-master` 관리자 Secret을 생성했습니다. 검증 중 발견한 60비트 버전 번호 반올림 문제를 52비트로 수정해 반복 변경을 해소했습니다. fmt, dev 및 독립 RDS validate, RDS mock 16개, dev mock 4개와 전체 mock Plan 점검 2개가 통과했습니다. 초기 Apply는 2 added / 1 changed / 0 destroyed였고 정밀도 수정은 Secret Version 한 개의 교체로 1 added / 1 changed / 1 destroyed였습니다. DB와 Secret 컨테이너는 유지했고 refresh-only로 출력도 갱신했습니다. 최종 State는 serial 15, 51개이며 전체 Plan은 0 add / 1 change / 0 destroy로 기존 CloudFront 차이만 남습니다. 실제 DB 로그인과 앱 배포는 미수행입니다. 이번 변경의 커밋 및 푸시는 사용자 후속 요청으로 승인받아 진행합니다.
+
 프로젝트 소개와 인프라 구성, Terraform 및 CI/CD의 역할, 실행 방법을 [루트 README](../README.md)에 작성했습니다. 기존 모듈 개발 기록은 참고 이력으로 유지하고 다음 작업은 dev 배포와 운영 검증을 중심으로 정리합니다.
 
-현재 요청인 [Unit 11의 DATABASE_URL Parameter 리소스 생성](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-리소스-생성)은 구현과 Review 후 사용자 요청으로 Apply와 구현 커밋 및 푸시까지 마쳤습니다. 초기값 `NOT_CONFIGURED`의 Standard SecureString을 생성했고 AWS 메타데이터에서 버전 1과 기본 SSM 키를 확인했습니다. State에는 실제 값이 없으며 ARN과 실행 역할의 읽기 권한도 일치합니다. fmt, validate, dev mock 4개와 전체 Plan 점검 2개가 통과했습니다. Apply는 SSM 하나만 1 added / 0 changed / 0 destroyed였고, 적용 후 전체 Plan은 Parameter no-op 및 기존 CloudFront Origin 표현 차이 1 change입니다. 구현 커밋 `40d3ddb`의 원격 main 반영을 확인했으며 실제 접속값 등록과 앱 배포는 미수행입니다.
+이전 작업인 [Unit 11의 DATABASE_URL Parameter 리소스 생성](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-리소스-생성)은 구현과 Review 후 사용자 요청으로 Apply와 구현 커밋 및 푸시까지 마쳤습니다. 초기값 `NOT_CONFIGURED`의 Standard SecureString을 생성했고 AWS 메타데이터에서 버전 1과 기본 SSM 키를 확인했습니다. State에는 실제 값이 없으며 ARN과 실행 역할의 읽기 권한도 일치합니다. fmt, validate, dev mock 4개와 전체 Plan 점검 2개가 통과했습니다. Apply는 SSM 하나만 1 added / 0 changed / 0 destroyed였고, 적용 후 전체 Plan은 Parameter no-op 및 기존 CloudFront Origin 표현 차이 1 change입니다. 구현 커밋 `40d3ddb`의 원격 main 반영을 확인했으며 실제 접속값 등록과 앱 배포는 미수행입니다.
 
 최근 인프라 작업인 [dev CloudFront 사용자 도메인](./ai-dlc/dev-cloudfront-custom-domain.md) 연결은 Ideation, Inception과 Unit 10 계획을 승인받아 Terraform 구현, 로컬 검증, ACM `ISSUED`와 기존 배포본 `ECSDZ4JA6Z85U`의 Apply를 완료했습니다. AWS에서는 `Deployed`, 별칭 `sbh.howon.me`, 비내보내기 인증서와 SNI 정책을 확인했고 State의 `frontend.url`도 사용자 도메인입니다. 사용자는 외부에서 정상 접속됐다고 확인했습니다. 이 컴퓨터의 DNS가 도메인을 보안 차단 주소로 바꿔 서비스용 CNAME의 정확한 대상과 응답 코드는 독립 확인하지 못했습니다. 적용 후 Plan의 CloudFront Origin 표현 차이 1건은 추가 적용하지 않았습니다. 후속 요청에 따라 구현 커밋 `637e5bd`를 `main`에 푸시하고 원격 SHA 일치를 확인했습니다.
 
@@ -184,6 +187,6 @@ dev Regional NAT와 private-only VPC 전환의 Ideation, Inception과 단일 Uni
 
 1. ADR의 팀 승인 상태는 별도로 확인합니다.
 2. 사용자 도메인은 AWS 적용과 사용자 접속 확인을 완료했습니다. 서비스용 CNAME 대상과 HTTP 상태 코드의 독립 검증이 필요하면 차단되지 않은 네트워크에서 확인합니다. 적용 후 Origin 블록 표현 차이가 보이는 Plan은 별도 원인 검토 전 추가 적용하지 않습니다.
-3. Unit 11의 Parameter 리소스는 초기값으로 생성됐습니다. 앱 이미지, DB 사용자와 실제 `DATABASE_URL`, 프론트 빌드를 준비한 뒤 CI/CD가 Task Definition과 Service를 배포합니다. 그 전에 마이그레이션 Task를 실행하고, 배포 후 두 AZ 배치와 API/DB 접속을 검증합니다. 배포 주체와 워크플로는 아직 이 저장소에서 구현하지 않았습니다.
+3. Unit 12의 관리자 암호는 비관리형으로 전환됐습니다. 콘솔 수동 변경은 RDS와 관리자 Secret을 함께 수정하고 VPC 내부에서 로그인을 확인합니다. Unit 11의 Parameter 리소스는 초기값으로 생성됐습니다. 앱 이미지, DB 사용자와 실제 `DATABASE_URL`, 프론트 빌드를 준비한 뒤 CI/CD가 Task Definition과 Service를 배포합니다. 그 전에 마이그레이션 Task를 실행하고, 배포 후 두 AZ 배치와 API/DB 접속을 검증합니다. 배포 주체와 워크플로는 아직 이 저장소에서 구현하지 않았습니다.
 4. stg/prd 환경 구성은 필요한 요구사항과 적용 범위를 승인받은 뒤 진행합니다.
 5. 계획, 로컬 테스트, AWS Plan, Apply, 배포, 커밋과 푸시를 계속 구분합니다.

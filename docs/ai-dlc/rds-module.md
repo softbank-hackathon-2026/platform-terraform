@@ -11,10 +11,12 @@
 | Construction | 기존 두 Unit 로컬 구현, Review 완료. Unit 3의 Design과 Implementation Plan 2026-09-24 승인, 로컬 구현, 테스트, Review 완료 |
 | RR/Secret 제약 수정 | Ideation, 수정 Inception, Unit 3 Construction 계획 승인. 모드별 Secret과 RR 조합 수정 완료, AWS 확인 대기 |
 | 구현과 테스트 | 일반 RDS 수정 후 mock Plan 16개, Aurora 회귀 mock Plan 14개 PASS |
-| Terraform Plan과 Apply | dev에 사용한 구성 실제 AWS Plan 확인. Apply와 다른 옵션의 AWS 검증은 미수행 |
-| AWS 리소스 확인 | 미수행. 일반 RDS RR과 RDS 관리형 관리자 Secret의 AWS 제약 확인 |
+| Terraform Plan과 Apply | dev Unit 12 비관리형 전환과 버전 정밀도 수정 Apply 및 최종 DB/Secret no-op 확인. 다른 엔진과 옵션의 실제 검증은 별도 |
+| AWS 리소스 확인 | dev 기존 DB 유지, 비관리형 관리자 Secret과 정확한 버전 번호 및 값 비저장 확인. RR과 Aurora의 실제 생성은 미검증 |
 | 커밋과 푸시 | 구현 커밋 `aa26615` 원격 main 포함 확인. 상태 기록은 후속 문서 커밋에 반영 |
 | Operation | 실제 배포, 관측, 복구 미수행. 배포 전 점검과 삭제 절차를 README에 기록 |
+
+dev PostgreSQL의 후속 비관리형 전환과 write-only 버전 정밀도 수정은 [Unit 12 기록](./dev-rds-password-management.md)에 정리합니다. 아래 최초 모듈 개발 시점의 기록은 이후 dev 운영 상태와 구분합니다.
 
 ## 1. Ideation
 
@@ -431,3 +433,11 @@ Review 결과, `rds_managed`와 `password_wo`가 동시에 설정되지 않으�
 사용자가 ECS와 PostgreSQL 플랫폼 구현 계획을 승인했습니다. PostgreSQL 17.11, db.t4g.small, Multi-AZ, RDS 관리형 암호와 RR 0개를 `env/dev`에 연결했고 `AWS_PROFILE=sbh-platform ./tf dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev.tfplan`으로 전체 56 add, 0 change, 0 destroy를 확인했습니다. Apply와 배포는 하지 않았으며 이 결과는 다른 모듈 옵션의 AWS 검증을 포함하지 않습니다. 자세한 로컬 테스트와 명령은 [Platform AI-DLC](./ecs-postgresql-platform.md)에 있습니다.
 
 서울 RDS API에서 PostgreSQL 17.11, db.t4g.small, gp3 최소 20 GiB와 Multi-AZ 지원을 읽기 전용으로 확인했습니다. dev에서는 Secret Version과 ephemeral 인스턴스가 생성되지 않습니다. Aurora, MySQL, RR와 모듈 소유 Secret의 실제 AWS Plan/Apply는 추가 검증하지 않았습니다.
+
+## 2026-10-01 dev 비관리형 전환과 버전 정밀도 수정
+
+사용자가 `비관리형으로 바꾸고 적용해줘`로 기존 DB를 유지한 dev 전환과 적용을 승인했습니다. `module_managed_secret`를 선택하고 초기 Apply에서 별도 관리자 Secret 및 Version을 생성해 기존 DB의 RDS 관리형을 해제했습니다. 이전 RDS 관리형 Secret은 AWS가 삭제했습니다. 상세 승인, Plan 및 Apply 기록과 콘솔 수동 변경 및 복구 절차는 [Unit 12](./dev-rds-password-management.md)를 따릅니다.
+
+실제 Apply 후 기존 60비트 write-only 버전 번호가 State에서 반올림되어 이후 Plan에서 Secret Version이 반복 교체되는 문제를 확인했습니다. Secret 사용자 이름과 Version ID의 SHA-256 앞 13자리에서 52비트 버전 번호를 만들도록 수정했습니다. 입력 속성, 기본 모드와 출력 계약은 바꾸지 않았습니다. 기존 60비트 배포본의 첫 수정은 Secret Version 갱신과 DB 암호 갱신을 수반하지만 DB와 Secret 컨테이너를 교체하지 않습니다.
+
+수정 모듈을 Git 제외 복사본에 두고 dev Lock 파일의 AWS 6.66.0, Random 3.9.1을 재사용했습니다. Terraform 1.16.4의 독립 validate와 dev validate가 통과했습니다. Terraform 1.17.0-beta2로 일반 RDS mock 16개, dev mock 4개와 전체 mock Plan 점검 2개가 통과했습니다. 번호가 float 숫자 변환에서 정확히 유지되는 범위도 확인했습니다. Plan 시점에 Version ID가 알려지도록 일반 RDS mock을 보강했습니다. 실제 수정 Apply 후 두 버전 번호가 State에 정확히 저장됐고 기존 DB 및 Secret 컨테이너가 유지됐습니다. 최종 State는 serial 15, 51개이며 전체 Plan에서 RDS와 관리자 Secret/Version은 no-op입니다. 출력 ARN은 refresh-only로 갱신했습니다. 실제 DB 로그인은 수행하지 않았습니다. 이번 수정의 커밋 및 푸시는 사용자 후속 요청으로 승인받아 진행합니다. Aurora와 다른 엔진의 실제 Apply 검증은 포함하지 않습니다.
