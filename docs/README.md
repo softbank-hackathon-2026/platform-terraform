@@ -64,7 +64,7 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 | dev `DATABASE_URL` Parameter Store | Unit 7 구현과 Review 완료. 값 등록은 별도 운영 작업 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 46 add / 0 change / 0 destroy, Parameter 미등록, Apply 미수행 | 구현 커밋 `2886bd4` 원격 main 확인 | [Unit 7](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-store-연동) |
 | dev ECS 배포 소유 경계 | Unit 8 구현과 Review 완료. Terraform은 기반 인프라, CI/CD는 Task Definition과 Service 소유 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, Task Definition과 Service 없음, Apply 미수행 | 구현 커밋 `2886bd4` 원격 main 확인 | [Unit 8](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-ecs-배포-소유-경계) |
 | dev 초기 DB 이름 `freesia` | Unit 9 구현과 Review 완료 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, RDS 이름 `freesia`, Apply 미수행 | 구현 커밋 `c0df773` 원격 main 확인 | [Unit 9](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia) |
-| dev CloudFront 사용자 도메인 `sbh.howon.me` | Unit 10 구현, 인증서 발급과 기존 배포본 적용 완료. 사용자 외부 접속 정상 보고 | fmt, validate, CloudFront mock 4개, dev mock 4개, 전체 Plan 검사 2개 통과 | ACM 요청 1 add, 최종 1 add / 1 change / 0 destroy Apply 완료. CloudFront `Deployed`. 적용 후 Origin 표현 차이 1 change Plan 미적용 | 이 변경의 커밋과 푸시 미수행 | [사용자 도메인 AI-DLC](./ai-dlc/dev-cloudfront-custom-domain.md) |
+| dev CloudFront 사용자 도메인 `sbh.howon.me` | Unit 10 구현, 인증서 발급과 기존 배포본 적용 완료. 사용자 외부 접속 정상 보고 | fmt, validate, CloudFront mock 4개, dev mock 4개, 전체 Plan 검사 2개 통과 | ACM 요청 1 add, 최종 1 add / 1 change / 0 destroy Apply 완료. CloudFront `Deployed`. 적용 후 Origin 표현 차이 1 change Plan 미적용 | 구현 커밋 `637e5bd` 원격 main 확인 | [사용자 도메인 AI-DLC](./ai-dlc/dev-cloudfront-custom-domain.md) |
 | 지속 문서화 | RDS, ECR 진행 상태 반영, 기존 10개 모듈 README의 입력, 출력 속성 표 정리와 향후 유지 규칙 추가 | 입력 97개, 출력 49개 코드 대조 및 문서 공백 점검 완료 | 해당 없음 | ECR, README 표, 규칙 커밋 `3f6dbdd` 원격 main 확인 | 이 문서 |
 
 IAM 구현 커밋 `2190a91`을 푸시한 직후 로컬 `HEAD`, `origin/main`, 원격 main의 SHA가 모두 `2190a91b4e6023492d71023f6c69a959d1a825b3`인 것을 확인했습니다.
@@ -157,7 +157,7 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ## 현재 작업과 다음 단계
 
-현재 작업은 [dev CloudFront 사용자 도메인](./ai-dlc/dev-cloudfront-custom-domain.md) 연결입니다. Ideation, Inception과 Unit 10 계획을 승인받아 Terraform 구현, 로컬 검증, ACM `ISSUED`와 기존 배포본 `ECSDZ4JA6Z85U`의 Apply를 완료했습니다. AWS에서는 `Deployed`, 별칭 `sbh.howon.me`, 비내보내기 인증서와 SNI 정책을 확인했고 State의 `frontend.url`도 사용자 도메인입니다. 사용자는 외부에서 정상 접속됐다고 확인했습니다. 이 컴퓨터의 DNS가 도메인을 보안 차단 주소로 바꿔 서비스용 CNAME의 정확한 대상과 응답 코드는 독립 확인하지 못했습니다. 적용 후 Plan의 CloudFront Origin 표현 차이 1건은 추가 적용하지 않았습니다. 이 변경의 커밋과 푸시는 수행하지 않았습니다.
+현재 작업은 [dev CloudFront 사용자 도메인](./ai-dlc/dev-cloudfront-custom-domain.md) 연결입니다. Ideation, Inception과 Unit 10 계획을 승인받아 Terraform 구현, 로컬 검증, ACM `ISSUED`와 기존 배포본 `ECSDZ4JA6Z85U`의 Apply를 완료했습니다. AWS에서는 `Deployed`, 별칭 `sbh.howon.me`, 비내보내기 인증서와 SNI 정책을 확인했고 State의 `frontend.url`도 사용자 도메인입니다. 사용자는 외부에서 정상 접속됐다고 확인했습니다. 이 컴퓨터의 DNS가 도메인을 보안 차단 주소로 바꿔 서비스용 CNAME의 정확한 대상과 응답 코드는 독립 확인하지 못했습니다. 적용 후 Plan의 CloudFront Origin 표현 차이 1건은 추가 적용하지 않았습니다. 후속 요청에 따라 구현 커밋 `637e5bd`를 `main`에 푸시하고 원격 SHA 일치를 확인했습니다.
 
 2026-10-01 사용자 도메인 Apply 전 S3 Backend State 조회에서는 관리 리소스 인스턴스 46개와 기존 CloudFront 배포본을 확인했고, 이번 두 단계 Apply 후에는 48개입니다. 아래의 “Apply 미수행” 문구는 각 과거 Unit을 기록한 당시 결과이며 현재 AWS에 리소스가 없다는 뜻은 아닙니다. 기존 인프라 생성 Apply 명령은 확인하지 못했고 애플리케이션 배포 상태도 별도로 검증해야 합니다.
 

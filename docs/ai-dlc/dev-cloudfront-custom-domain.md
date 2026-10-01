@@ -75,5 +75,6 @@ S3 Backend의 `sbh-platform/dev/terraform.tfstate`는 2026-10-01 04:50:40 UTC에
 | 2026-10-01 | `dig +short CNAME sbh.howon.me`, 기본 CloudFront 도메인과 비교 | 이 컴퓨터의 DNS는 사용자 도메인을 `sinkhole.paloaltonetworks.com`으로 응답. 기본 CloudFront 도메인은 정상 IP 응답 |
 | 2026-10-01 | `curl https://sbh.howon.me/`, `curl --resolve sbh.howon.me:443:52.85.128.64 https://sbh.howon.me/`, 인증서 발급자 확인 | 일반 연결 실패. IP 지정 연결은 HTTP 503 보안 정책 차단 페이지이며 인증서 발급자는 로컬 Forward Trust CA. CloudFront 사용자 도메인의 외부 HTTPS 성공으로 판정하지 않음. 기본 CloudFront 주소는 HTTP 200 |
 | 2026-10-01 | 사용자 외부 접속 확인 응답 | 사용자가 “배포 잘 됐음”이라고 확인. 응답 코드와 인증서 세부 정보는 전달받지 않음 |
+| 2026-10-01 | 후속 요청에 따라 `git commit -m 'feat: add sbh.howon.me to dev CloudFront'`, `git push origin main`, `git ls-remote origin refs/heads/main` | 구현 커밋 `637e5bd316c68288103afa2b1759dc1d16703bbe` 생성과 푸시 완료, 원격 main SHA 일치 확인 |
 
 ACM 검증용 Cloudflare CNAME은 이름 `_9e15a309b5fd291f81fe79d521e3d6c7.sbh.howon.me.`, 대상 `_ce295af0ad7d398da41539f90eed0136.wzccmgtwzk.acm-validations.aws.`입니다. 사용자가 `DNS only` 레코드 등록을 완료했다고 2026-10-01 답했고 ACM이 검증을 완료했습니다. CloudFront 최종 Apply와 AWS 배포 상태 확인도 완료했으며 사용자가 외부 접속 정상 동작을 보고했습니다. 기존 서비스용 CNAME의 정확한 대상과 외부망 HTTP 상태 코드는 독립 확인하지 못했습니다.
