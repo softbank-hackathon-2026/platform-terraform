@@ -8,6 +8,7 @@ Security Group, VPC Endpoint, VPC Peering, Transit Gateway, VPN, Network Firewal
 
 - VPC DNS resolution과 DNS hostname을 활성화합니다.
 - 모든 Subnet의 Public IP 자동 할당을 끕니다.
+- Public과 Private Subnet 입력은 선택 사항입니다. 생략한 종류의 Subnet은 생성하지 않습니다.
 - Private Subnet마다 Route Table을 하나씩 생성합니다.
 - NAT Gateway는 기본적으로 생성하지 않습니다.
 - 입력 태그보다 모듈의 `Name` 태그를 우선합니다.
@@ -20,7 +21,7 @@ Security Group, VPC Endpoint, VPC Peering, Transit Gateway, VPN, Network Firewal
 | `name` | `string` | 필수 | VPC와 관련 리소스 이름의 접두사입니다. |
 | `vpc_cidr` | `string` | 필수 | VPC의 IPv4 CIDR입니다. |
 | `public_subnets` | `map(object)` | `{}` | 논리 키별 Public Subnet 정의입니다. |
-| `private_subnets` | `map(object)` | 필수 | 논리 키별 Private Subnet 정의입니다. 하나 이상 필요합니다. |
+| `private_subnets` | `map(object)` | `{}` | 논리 키별 Private Subnet 정의입니다. 생략하거나 빈 Map을 지정하면 생성하지 않습니다. |
 | `nat_gateway_mode` | `string` | `"none"` | `none`, `regional`, `zonal` 중 NAT 구성을 선택합니다. |
 | `zonal_nat_subnet_keys` | `map(string)` | `{}` | Zonal NAT를 배치할 Public Subnet 논리 키를 AZ별로 지정합니다. |
 | `tags` | `map(string)` | `{}` | 네트워크 리소스에 붙일 추가 태그입니다. Name은 모듈 이름이 우선합니다. |
@@ -47,9 +48,9 @@ Security Group, VPC Endpoint, VPC Peering, Transit Gateway, VPN, Network Firewal
 | `vpc_id` | 생성된 VPC ID입니다. |
 | `vpc_cidr_block` | VPC의 IPv4 CIDR입니다. |
 | `public_subnet_ids` | 논리 키별 Public Subnet ID Map입니다. 없으면 `{}`입니다. |
-| `private_subnet_ids` | 논리 키별 Private Subnet ID Map입니다. |
+| `private_subnet_ids` | 논리 키별 Private Subnet ID Map입니다. 없으면 `{}`입니다. |
 | `public_route_table_id` | Public Route Table ID입니다. Public Subnet이 없으면 `null`입니다. |
-| `private_route_table_ids` | 논리 키별 Private Route Table ID Map입니다. |
+| `private_route_table_ids` | 논리 키별 Private Route Table ID Map입니다. 없으면 `{}`입니다. |
 | `nat_gateway_ids_by_az` | NAT 경로를 사용하는 AZ별 NAT Gateway ID Map입니다. NAT가 없으면 `{}`입니다. |
 
 ## NAT 모드
@@ -77,6 +78,26 @@ private_subnets = {
 ```
 
 NAT Gateway에는 시간 및 데이터 처리 비용이 발생합니다. `nat_gateway_mode` 변경 시 NAT Gateway와 EIP가 생성되거나 제거되고 인터넷 송신이 일시적으로 중단될 수 있으므로 적용 전에 Plan을 확인하세요.
+
+## Public Subnet만 사용
+
+`private_subnets`를 생략하거나 `{}`로 지정할 수 있습니다. 기본 NAT 모드는 `none`이므로 Private Subnet, Private Route Table과 NAT Gateway는 생성하지 않습니다. Public Subnet과 공유 Public Route Table, Internet Gateway 및 인터넷 기본 경로를 생성합니다.
+
+```hcl
+module "network" {
+  source = "../../modules/network"
+
+  name     = "sample-dev"
+  vpc_cidr = "10.10.0.0/16"
+
+  public_subnets = {
+    web_a = {
+      availability_zone = "ap-northeast-2a"
+      cidr_block        = "10.10.0.0/24"
+    }
+  }
+}
+```
 
 ## NAT 없이 사용
 

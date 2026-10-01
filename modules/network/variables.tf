@@ -44,11 +44,7 @@ variable "private_subnets" {
     cidr_block        = string
     enable_nat_route  = optional(bool, true)
   }))
-
-  validation {
-    condition     = length(var.private_subnets) > 0
-    error_message = "private_subnets에는 하나 이상의 Subnet이 필요합니다."
-  }
+  default = {}
 
   validation {
     condition = alltrue([
