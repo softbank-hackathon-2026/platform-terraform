@@ -6,17 +6,19 @@
 
 | 구분 | 상태 |
 |---|---|
-| Ideation | 최초 계획과 후속 Unit 5~9 범위 승인 |
-| Inception | 최초 계획과 후속 Unit 5~9 요구사항 승인 |
-| Construction | Unit 1~9 구현과 Review 완료. dev Task Definition과 Service는 CI/CD 소유로 변경 |
-| 로컬 검증 | 최신 Unit 9 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 9에서 재실행하지 않음 |
-| 실제 AWS Plan | Unit 9 변경 후 `sbh-platform`, 서울, S3 Backend에서 46 add / 0 change / 0 destroy. DB 이름 `freesia`, 교체 없음 |
-| Apply와 배포 | 사용자 지시로 수행하지 않음 |
-| 커밋과 푸시 | 기존 구현과 후속 Unit 5~9의 원격 반영 확인. Unit 9 구현 커밋 `c0df773` 원격 main 확인 |
+| Ideation | 최초 계획과 후속 Unit 5~9 및 11 범위 승인 |
+| Inception | 최초 계획과 후속 Unit 5~9 및 11 요구사항 승인 |
+| Construction | Unit 1~9 및 11 구현과 Review 완료. dev Task Definition과 Service는 CI/CD 소유 |
+| 로컬 검증 | 최신 Unit 11 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 11에서 재실행하지 않음 |
+| 실제 AWS Plan | Unit 11 Apply 전 SSM 대상 지정 1 add / 0 change / 0 destroy. Apply 후 전체 Plan 0 add / 1 change / 0 destroy. SSM 추가 변경 없이 기존 CloudFront Origin 표현 차이만 남음 |
+| Apply와 배포 | Unit 11 Parameter 생성 Apply 완료, 1 added / 0 changed / 0 destroyed. 실제 접속값 등록과 앱 배포 미수행. 사용자 도메인 Unit 10은 별도 기록 참고 |
+| 커밋과 푸시 | Unit 11 Apply 기록까지 반영한 커밋과 푸시 진행 중 |
 
-초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit 5와 6의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
+초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 Apply는 명시적으로 승인된 해당 Unit 범위에서만 수행합니다.
 
-아래 1~4절은 최초 구현 당시 기록입니다. 앱 Secrets Manager 구성에 관한 당시 설계와 검증은 후속 Unit 7이, Terraform의 Task Definition과 Service 소유는 Unit 8이 대체했습니다. 현재 상태는 위 표와 Unit 8 기록을 따릅니다.
+아래 1~4절은 최초 구현 당시 기록입니다. 앱 Secrets Manager 구성에 관한 당시 설계와 검증은 후속 Unit 7이, Terraform의 Task Definition과 Service 소유는 Unit 8이 대체했습니다. Parameter 리소스 생성과 값 비저장 및 Provider 조회 경계는 Unit 11 기록을 따릅니다.
+
+2026-10-01 후속 요청으로 `DATABASE_URL` Parameter 리소스 생성 방향과 Unit 11의 Inception, Design 및 Implementation Plan을 승인받아 구현, 로컬 검증과 실제 AWS Plan Review를 완료했습니다. 이후 사용자가 `apply하고 커밋 푸시`로 Parameter 생성 Apply와 커밋 및 푸시를 승인했습니다. 기존 CloudFront 변경을 제외한 새 SSM 대상 지정 Plan을 검토해 Parameter 하나를 생성했고, 메타데이터와 State의 값 비저장 및 적용 후 Plan을 확인했습니다. 사용자 도메인 Unit 10의 Apply는 [별도 AI-DLC](./dev-cloudfront-custom-domain.md)에 기록되어 있으므로 이번 Unit과 구분합니다.
 
 ## 1. Ideation
 
@@ -386,3 +388,78 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 | 2026-10-01 | `git diff --cached --check`, `git diff --cached --name-only` | 공백 오류 없음, 검토한 6개 파일만 스테이징 확인 |
 | 2026-10-01 | `git commit -m 'fix: set dev database name to freesia'`, `git push origin main` | 구현 커밋 `c0df773501058de4b09291b3ce134b9b6d9e0a3d` 푸시 완료 |
 | 2026-10-01 | `git ls-remote origin refs/heads/main` | 원격 SHA `c0df773501058de4b09291b3ce134b9b6d9e0a3d`로 구현 커밋과 일치 |
+
+## 후속 변경: dev DATABASE_URL Parameter 리소스 생성
+
+### Ideation: 승인됨
+
+- 문제 정의: dev Terraform은 Parameter ARN과 실행 역할의 읽기 권한만 제공하며 `/sbh/platform/demo/backend/DATABASE_URL` 리소스를 생성하지 않습니다.
+- 사용자: dev 인프라와 백엔드 운영 담당자입니다.
+- 성공 기준: Terraform이 실제 접속 정보를 넣지 않고 SecureString Parameter 리소스를 생성할 수 있어야 합니다. 운영자가 이후 등록한 값은 Terraform이 초기값으로 되돌리지 않아야 합니다.
+- Scope: dev의 Parameter 리소스 하나, 기존 ARN 및 IAM 계약 유지, 결합 검증과 관련 운영 문서입니다.
+- Non-goals: 앱 DB 계정 생성, 실제 `DATABASE_URL` 등록, 앱 배포, ECS Task Definition과 Service 생성입니다. 최초 제안은 코드 변경과 검증까지였으며 Parameter 생성 Apply와 커밋 및 푸시는 이후 별도 요청으로 승인받았습니다.
+- 승인: 2026-10-01 사용자가 `그러면 일단 리소스 생성만 하게 ㄱㄱ`로 리소스 생성 방향을 승인했습니다. 초기값과 생성 이후 관리 방식은 아래 Inception 및 Design의 승인 대상입니다.
+
+### Inception: 승인됨
+
+- Functional Requirements: 기존 경로에 Standard 등급의 SecureString을 만들고 기본 `alias/aws/ssm` 키를 사용합니다. 생성 시 필요한 초기값은 접속 URL이 아닌 `NOT_CONFIGURED`입니다. 기존 ARN 출력과 실행 역할의 `ssm:GetParameters` 정책을 유지합니다. 실제 값은 운영 경로에서 이후 갱신합니다.
+- Non-Functional Requirements: 초기값은 `value_wo`로 전달하고 갱신 번호는 1로 고정합니다. 실제 접속 정보가 Terraform 변수, 출력, Plan과 State에 저장되지 않게 합니다. AWS Provider 6.66.0은 write-only 모드에서도 refresh 시 `GetParameter`를 복호화 옵션으로 호출하므로, Unit 7의 "Terraform이 실제 값을 조회하지 않는다" 조건을 대체합니다. 사용자는 값 비저장과 Provider의 refresh 조회를 구분하는 이 제약까지 승인했습니다.
+- Architecture: Terraform이 비밀이 아닌 초기값으로 Parameter를 생성하고 메타데이터 및 태그를 State에 관리합니다. 운영자가 실제 값을 갱신하며 CI/CD는 기존 ARN으로 Task Definition의 Secret 참조를 구성합니다. 초기값이 남아 있는 동안에는 DB 접속 준비가 완료된 상태가 아닙니다.
+- Unit of Work: Unit 11 하나로 생성 구성, 기존 결합 검증 변경, 문서와 실제 AWS Plan 검토를 처리합니다.
+- Acceptance Criteria: dev mock Plan에 정확한 경로의 SecureString Parameter가 하나 있고 일반 `value`와 `insecure_value`가 비어 있어야 합니다. 기존 ARN 출력 및 최소 읽기 권한이 일치해야 합니다. Terraform 관리 앱 Secret, Task Definition과 Service는 계속 없어야 합니다. fmt, validate, dev mock 및 전체 Plan 검사를 실제 실행합니다. AWS 인증이 가능한 경우 새 Plan에서 생성과 변경, 삭제 및 교체를 검토하고 다른 리소스 변경을 구분합니다.
+
+### Construction Unit 11: Design과 Implementation Plan 승인됨
+
+- Design: `env/dev`에 `aws_ssm_parameter.database_url`을 추가합니다. 경로를 Local 값 하나로 정의하고 기존 ARN은 같은 경로로 계산해 IAM 및 출력의 계획값을 유지합니다. `value_wo = "NOT_CONFIGURED"`, `value_wo_version = 1`, `overwrite = false`, 공통 태그를 사용합니다. `prevent_destroy = true`로 삭제 및 이름 변경에 따른 교체를 막습니다.
+- 생성 이후 관리: `ignore_changes`에 `value_wo_version`, `allowed_pattern`, `data_type`, `description`, `key_id`, `tier`, `type`을 지정합니다. 현 Provider에서 이러한 속성 변경은 값을 다시 쓰는 API를 호출하므로 생성 이후 Terraform은 태그 변경만 관리합니다. `overwrite = false`는 기존 외부 Parameter가 있거나 잘못된 값 갱신이 계획됐을 때 덮어쓰기 대신 실패하게 하는 추가 제약입니다. 새 경로, 키 및 유형 변경은 별도 설계 대상입니다.
+- Implementation Plan: 경로 Local과 Parameter 구성 파일을 추가합니다. 결합 mock에 고정 ARN을 제공하고 기존 전체 Plan 검사에서 SSM 리소스 금지 조건을 정확한 리소스 하나 및 값 비저장 조건으로 바꿉니다. dev README, 루트 README와 Runbook에 초기값, 운영자의 값 갱신, Provider의 refresh 조회 및 생성 이후 관리 범위를 반영합니다. AI-DLC와 `docs/README.md`를 같은 작업에서 갱신합니다. fmt, validate, 기존 dev mock과 전체 Plan 검사 후 SSO 인증이 복구되면 실제 AWS Plan을 Review합니다.
+- Approval: 2026-10-01 사용자가 제시한 설계에 `ㄱㄱ`로 답해 Inception, Unit 11 Design과 Implementation Plan 및 코드 변경과 검증을 승인했습니다. 초기값, write-only 값 비저장, Provider의 refresh 조회와 생성 이후 갱신 방지 방식을 포함합니다. 이후 `apply하고 커밋 푸시`로 Parameter 리소스 생성 Apply와 커밋 및 푸시를 추가 승인했습니다. 실제 접속값 등록과 앱 배포는 포함하지 않습니다.
+- Implementation: `env/dev/parameter-store.tf`에 Standard SecureString 리소스를 추가하고 경로 Local을 기존 ARN 계산과 공유했습니다. 승인한 `value_wo`, 고정 갱신 번호, 생성 이후 메타데이터 무시, 덮어쓰기 및 삭제 방지, 공통 태그를 적용했습니다. 기존 IAM과 출력 계약은 유지하고 결합 mock 및 전체 Plan 검사, 루트 및 dev README와 Runbook을 갱신했습니다. 모듈 입력과 출력은 변경하지 않았습니다.
+- Test: fmt, validate 및 Python 구문 검사가 통과했습니다. dev mock 4개와 기본 및 재정의 포트의 전체 Plan 검사 2개가 통과했고 Parameter 리소스 하나, Standard SecureString, 기본 SSM 키, 값 비저장, ARN 및 IAM 계약을 확인했습니다. 최초 샌드박스 실행의 Provider handshake 실패는 허용된 환경에서 재실행해 해결했습니다. SPA 테스트는 이번 변경에서 재실행하지 않았습니다.
+- Review: Apply 전 지정 Parameter가 없음을 확인하고 새 SSM 대상 지정 Plan 1 add / 0 change / 0 destroy를 검토했습니다. Apply 결과는 1 added / 0 changed / 0 destroyed이며 AWS 메타데이터는 지정 경로, SecureString, Standard, `alias/aws/ssm`, 버전 1입니다. 적용 후 State serial 10, 관리 리소스 인스턴스 49개이며 Parameter의 `has_value_wo = true`, `value = ""`, `insecure_value = null`, `value_wo = null`로 비밀값이 저장되지 않았습니다. 실제 ARN과 출력 및 실행 정책도 일치합니다. 적용 후 전체 Plan은 0 add / 1 change / 0 destroy이고 Parameter는 no-op, 기존 CloudFront Origin 표현 차이만 남습니다. 운영자의 실제 접속값 갱신 이후 동작과 DB 접속은 미검증입니다.
+- Operation: 사용자 승인 후 검토한 저장 Plan으로 Parameter 리소스만 Apply했습니다. CloudFront와 기타 리소스는 변경하지 않았으며 대상 지정 경고에 따라 적용 후 전체 Plan을 확인했습니다. 실제 접속값 등록과 앱 배포는 미수행입니다. Runbook에 초기값 상태와 운영자의 값 갱신을 기록했습니다. CLI에서 비밀값을 출력하지 않았으며 Provider가 자체적으로 수행하는 refresh 조회는 별도 제약으로 기록했습니다.
+- Git: 구현과 Apply 검증 기록의 커밋 및 푸시를 진행합니다. Backend 설정과 State, Plan, Provider 및 테스트 CLI는 Git 제외 경로에 보관했습니다.
+
+### Unit 11 사전 확인 기록
+
+| 날짜 | 명령 또는 자료 | 결과 |
+|---|---|---|
+| 2026-10-01 | `git status --short --branch`, `rg -n 'aws_ssm\|ssm:\|database_url'`로 dev 코드 및 관련 문서 확인 | 작업 시작 시 main 작업 트리 변경 없음. 생성 리소스 없이 ARN 및 읽기 권한만 확인 |
+| 2026-10-01 | `env/dev/.terraform.lock.hcl`, [AWS PutParameter API](https://docs.aws.amazon.com/systems-manager/latest/APIReference/API_PutParameter.html), [AWS Provider 6.66.0 SSM 문서](https://github.com/hashicorp/terraform-provider-aws/blob/v6.66.0/website/docs/r/ssm_parameter.html.markdown), [동일 버전 구현](https://github.com/hashicorp/terraform-provider-aws/blob/v6.66.0/internal/service/ssm/parameter.go) | 고정 AWS Provider 6.66.0. 생성 시 Value 필수. `value_wo` 비저장 지원, refresh 복호화 조회와 메타데이터 변경의 값 쓰기 경로 확인 |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 ssm describe-parameters --parameter-filters Key=Name,Option=Equals,Values=/sbh/platform/demo/backend/DATABASE_URL --query 'Parameters[].[Name,Type,KeyId]' --output json` | 기본 환경에서는 OIDC endpoint 연결 실패. 허용된 네트워크에서 재시도 시 `Token has expired and refresh failed`. 현재 존재 여부 미확인, 비밀값 조회 없음 |
+| 2026-10-01 | `git diff --check`, Python 인라인 문서 금지 문자 검사, `git diff --stat` | 문서 공백 오류와 금지 문자 없음. 변경 파일은 AI-DLC와 문서 인덱스 2개이며 Terraform 코드 변경 없음 |
+
+### Unit 11 구현 및 검증 기록
+
+| 날짜 | 명령 | 결과 |
+|---|---|---|
+| 2026-10-01 | `terraform -chdir=env/dev init -backend=false -lockfile=readonly -input=false -no-color` | AWS Provider 6.66.0과 Random 3.9.1 초기화 완료. 잠금 파일 변경 없음 |
+| 2026-10-01 | 공식 HashiCorp Releases의 1.17.0-beta2 Darwin ARM64 ZIP과 SHA256SUMS 다운로드 및 Python SHA-256 대조 | 일치: `353b17a245e6857830d9bdcc81a2ef78b4bf246ed80303dd5673675f07667dde`. 기존 ephemeral mock 제약 때문에 테스트에만 사용 |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 ssm describe-parameters --parameter-filters Key=Name,Option=Equals,Values=/sbh/platform/demo/backend/DATABASE_URL --query 'Parameters[].[Name,Type,KeyId]' --output json` | SSO 재인증 후 빈 배열. 지정 Parameter 없음, 비밀값 조회 없음 |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 s3api head-object --bucket sbh-platform-prod-s3-tf --key sbh-platform/dev/terraform.tfstate --query '{LastModified:LastModified,ContentLength:ContentLength}' --output json` | 기록된 기존 dev Backend 파일 확인. 이후 전체 Plan의 prior_state에서 관리 리소스 인스턴스 48개 확인 |
+| 2026-10-01 | `terraform -chdir=env/dev init -reconfigure -backend-config=backend.local.hcl -lockfile=readonly -input=false -no-color` | 기존 S3 Backend 연결 완료. State 이전 및 Apply 없음. 실제 Backend 설정은 Git 제외 파일에 작성 |
+| 2026-10-01 | `terraform fmt env/dev/main.tf env/dev/parameter-store.tf env/dev/tests-terraform-1.17/platform.tftest.hcl`, `terraform fmt -check -recursive env/dev`, Python AST 검사 | PASS |
+| 2026-10-01 | `terraform -chdir=env/dev validate -no-color`, dev mock 테스트 최초 기본 샌드박스 실행 | Provider handshake 실패. 구성 검증 및 테스트 완료로 표시하지 않음 |
+| 2026-10-01 | `terraform -chdir=env/dev validate -no-color` | 허용된 환경에서 재실행 PASS |
+| 2026-10-01 | `.local/terraform-1.17.0-beta2/terraform -chdir=env/dev test -test-directory=tests-terraform-1.17 -no-color -verbose -json > .local/dev-ssm-parameter-tests.jsonl` | 허용된 환경에서 mock 4 PASS / 0 FAIL |
+| 2026-10-01 | `python3 scripts/check-dev-test-plan.py .local/dev-ssm-parameter-tests.jsonl` | 기본 포트와 재정의 포트의 전체 Plan 검사 2 PASS |
+| 2026-10-01 | `terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-ssm-parameter.tfplan > .local/dev-ssm-parameter-plan.log` | 안정 버전 1.16.4, 종료 코드 2. 1 add / 1 change / 0 destroy |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-ssm-parameter.tfplan > .local/dev-ssm-parameter.tfplan.json` 및 Python 검사 | Parameter 생성 하나, 값 필드 부재, 기존 CloudFront `origin` 표현 차이만 갱신, 삭제와 교체 없음 |
+| 2026-10-01 | `terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -target=aws_ssm_parameter.database_url -out=../../.local/dev-ssm-parameter-only.tfplan > .local/dev-ssm-parameter-only-plan.log` | 종료 코드 2. 1 add / 0 change / 0 destroy. 대상 지정 경고는 이 보조 Plan에 예상된 결과 |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-ssm-parameter-only.tfplan > .local/dev-ssm-parameter-only.tfplan.json` 및 Python 검사 | 변경 리소스는 Parameter 생성 하나이며 실제 값 필드 부재 확인 |
+| 2026-10-01 | `git check-ignore env/dev/backend.local.hcl .local/dev-ssm-parameter.tfplan .local/dev-ssm-parameter-tests.jsonl`, `git diff` 및 신규 리소스 파일 Review | Backend, Plan과 검증 산출물 Git 제외 확인. 승인한 생성 범위와 기존 계약 유지 확인 |
+| 2026-10-01 | `git diff --check`, Python 인라인 문서 상대 링크 및 앵커와 금지 문자 검사 | PASS. 상대 링크 및 앵커 79개 확인, 신규 Parameter 파일을 포함한 변경 파일 9개의 금지 문자 없음 |
+
+### Unit 11 Apply 검증 기록
+
+| 날짜 | 명령 | 결과 |
+|---|---|---|
+| 2026-10-01 | 사용자 요청 `apply하고 커밋 푸시` | Parameter 생성 Apply와 커밋 및 푸시 승인. 실제 접속값 등록과 앱 배포 제외 |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 ssm describe-parameters --parameter-filters Key=Name,Option=Equals,Values=/sbh/platform/demo/backend/DATABASE_URL --query 'Parameters[].[Name,Type,KeyId]' --output json` | Apply 전 빈 배열, 기존 Parameter 없음 |
+| 2026-10-01 | `terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -target=aws_ssm_parameter.database_url -out=../../.local/dev-ssm-parameter-apply.tfplan > .local/dev-ssm-parameter-apply-plan.log` | 종료 코드 2. 최신 Plan 1 add / 0 change / 0 destroy |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-ssm-parameter-apply.tfplan > .local/dev-ssm-parameter-apply.tfplan.json` 및 Python 검사 | 변경 항목은 정확히 Parameter 생성 하나. 경로, 유형, 키와 값 필드 비저장 확인 |
+| 2026-10-01 | `terraform -chdir=env/dev apply -input=false -no-color ../../.local/dev-ssm-parameter-apply.tfplan > .local/dev-ssm-parameter-apply.log` | 종료 코드 0. 1 added / 0 changed / 0 destroyed. 대상 지정의 불완전 적용 경고는 이후 전체 Plan으로 확인 |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 ssm describe-parameters --parameter-filters Key=Name,Option=Equals,Values=/sbh/platform/demo/backend/DATABASE_URL --query 'Parameters[].{Name:Name,Type:Type,Tier:Tier,KeyId:KeyId,Version:Version}' --output json` | 경로 일치, SecureString, Standard, `alias/aws/ssm`, 버전 1. 비밀값 조회 없음 |
+| 2026-10-01 | `terraform -chdir=env/dev state pull > .local/dev-ssm-parameter-postapply.tfstate` 및 Python 검사 | serial 10, 관리 인스턴스 49개. SDK가 `value`를 null 대신 빈 문자열로 저장하는 점을 반영해 미저장 판별을 보정. 값 없음, write-only 플래그와 ARN 및 IAM 계약 일치 |
+| 2026-10-01 | `terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-ssm-parameter-postapply.tfplan > .local/dev-ssm-parameter-postapply-plan.log` | 종료 코드 2. 0 add / 1 change / 0 destroy |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-ssm-parameter-postapply.tfplan > .local/dev-ssm-parameter-postapply.tfplan.json` 및 Python 검사 | Parameter no-op 및 값 비저장. 기존 CloudFront Origin 표현 차이만 남으며 삭제와 교체 없음 |

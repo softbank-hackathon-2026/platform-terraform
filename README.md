@@ -33,13 +33,13 @@ Public Subnet은 만들지 않습니다. Internet Gateway는 Regional NAT와 Clo
 
 | 담당 | 관리 범위 |
 |---|---|
-| Terraform | VPC와 라우팅, 보안 그룹, S3와 CloudFront, ACM, ALB와 Target Group, ECR, ECS Cluster와 로그 그룹, IAM, RDS |
+| Terraform | VPC와 라우팅, 보안 그룹, S3와 CloudFront, ACM, ALB와 Target Group, ECR, ECS Cluster와 로그 그룹, IAM, RDS, 초기값으로 생성하는 SSM Parameter |
 | 애플리케이션 CI/CD | 이미지 빌드와 ECR 업로드, Task Definition 등록, 마이그레이션 Task 실행, ECS Service 생성과 갱신, 프론트 빌드 업로드 |
 | 운영자 | 앱 전용 DB 사용자와 권한, `DATABASE_URL` SecureString 값, Cloudflare DNS 레코드 준비 |
 
 CI/CD는 Terraform의 `network`, `frontend`, `backend`, `database` 출력을 배포 입력으로 사용합니다. ECS 컨테이너 이름은 `app`, 기본 포트는 `8000`이며, Task Definition과 Service는 CI/CD가 관리합니다. 배포 주체와 워크플로 구현은 별도 작업입니다.
 
-DB 접속 정보는 `/sbh/platform/demo/backend/DATABASE_URL`의 SSM SecureString으로 준비하고 Task Definition의 Secret 참조로 주입합니다. Terraform은 Parameter ARN과 읽기 권한을 제공하며 실제 비밀값을 생성하거나 조회하지 않습니다.
+DB 접속 정보는 `/sbh/platform/demo/backend/DATABASE_URL`의 SSM SecureString으로 준비하고 Task Definition의 Secret 참조로 주입합니다. Terraform은 초기값 `NOT_CONFIGURED`로 Parameter 리소스를 생성하고 ARN과 읽기 권한을 제공합니다. 운영자는 배포 전에 실제 접속값으로 갱신합니다. Terraform은 생성 이후 값과 관련 메타데이터 변경을 무시하고 태그만 관리하며, `value_wo`를 사용해 실제 값을 Plan과 State에 저장하지 않습니다. 현재 AWS Provider는 refresh 시 값을 복호화해 읽으므로 Terraform이 값을 전혀 조회하지 않는 구조는 아닙니다.
 
 배포 입력과 순서는 [dev README](env/dev/README.md)와 [운영 Runbook](docs/runbooks/ecs-postgresql-platform.md)에서 확인합니다.
 
@@ -53,7 +53,7 @@ DB 접속 정보는 `/sbh/platform/demo/backend/DATABASE_URL`의 SSM SecureStrin
 
 2026-10-01 작업 기록에서는 dev 인프라의 S3 State를 확인했고, 기존 CloudFront에 사용자 도메인과 인증서를 적용한 뒤 ACM `ISSUED`, CloudFront `Deployed`를 확인했습니다. 사용자는 외부 접속이 정상이라고 보고했습니다. 애플리케이션 배포와 API/DB 연결은 별도로 검증해야 합니다.
 
-도메인 적용 후 Plan에는 CloudFront Origin 블록의 표현 차이로 변경 1건이 남았으며 추가 Apply는 수행하지 않았습니다. 자세한 검증 결과는 [사용자 도메인 작업 기록](docs/ai-dlc/dev-cloudfront-custom-domain.md), 전체 진행 상태와 다음 작업은 [프로젝트 문서](docs/README.md)에 정리합니다.
+2026-10-01 Unit 11에서 `DATABASE_URL` Parameter 하나를 초기값으로 생성했습니다. 적용 후 State는 serial 10, 관리 리소스 인스턴스 49개이며 Parameter 값 비저장과 실제 ARN 및 IAM 계약을 확인했습니다. 전체 Plan에는 기존 CloudFront Origin 표현 차이 변경 1건만 남고 이 변경은 적용하지 않았습니다. [Parameter 생성 기록](docs/ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-리소스-생성), [사용자 도메인 작업 기록](docs/ai-dlc/dev-cloudfront-custom-domain.md), [프로젝트 문서](docs/README.md)에 검증 결과와 다음 작업을 정리합니다.
 
 ## 저장소 구조
 

@@ -2,7 +2,7 @@
 
 작성일: 2026-10-01
 
-이 문서는 인프라와 앱 배포 절차예요. 2026-10-01 사용자 도메인 Apply 후 S3 Backend State에는 관리 리소스 인스턴스 48개가 기록되어 있어요. 실제 리소스 상태는 새 Plan과 서비스 조회로 다시 확인하세요. 기존 구현 검증은 [Platform AI-DLC](../ai-dlc/ecs-postgresql-platform.md), 사용자 도메인 작업은 [CloudFront AI-DLC](../ai-dlc/dev-cloudfront-custom-domain.md)에 기록해요.
+이 문서는 인프라와 앱 배포 절차예요. 2026-10-01 Unit 11 Parameter 생성 Apply 후 S3 Backend State는 serial 10, 관리 리소스 인스턴스 49개예요. 최신 전체 Plan에는 기존 CloudFront Origin 표현 차이 변경 1개만 남고 Parameter는 추가 변경이 없어요. 실제 리소스 상태는 새 Plan과 서비스 조회로 다시 확인하세요. 기존 구현과 Parameter 생성 검증은 [Platform AI-DLC](../ai-dlc/ecs-postgresql-platform.md), 사용자 도메인 작업은 [CloudFront AI-DLC](../ai-dlc/dev-cloudfront-custom-domain.md)에 기록해요.
 
 ## CloudFront 사용자 도메인
 
@@ -17,8 +17,8 @@
 1. `sbh-platform` 인증, 서울 리전과 기존 S3 Backend를 확인해요. State Key는 dev 전용으로 유지해요. `AWS_PROFILE=sbh-platform ./tf dev plan`에서 변경과 삭제, 활성 AZ별 비용이 발생하는 Regional NAT 1개, ALB, RDS Multi-AZ를 검토해요.
 2. 초기 구축이 필요한 환경에서는 승인 후 인프라 준비 구성을 적용해요. 이미 State가 있는 dev는 새 Plan의 변경과 삭제를 검토한 뒤 필요한 변경만 적용해요. Terraform은 ECS Cluster와 로그 그룹을 관리하지만 Task Definition과 Service는 관리하지 않아요. CI/CD가 서비스를 배포하기 전에는 ALB Target이 비어 있으므로 `/api`의 503은 예상 상태예요.
 3. VPC 내부에서 DB에 접속할 수 있는 별도 관리 경로를 준비해요. 현재 Terraform에는 DB 접근용 공개 포트, Bastion과 관리자 ECS Task가 없어요. RDS 관리자 Secret으로 접속해 실제 `db_name`의 앱 전용 사용자를 만들고 필요한 스키마 권한만 부여해요. 관리자 계정을 앱에서 사용하지 않아요. 현재 기본 DB 이름은 `freesia`예요.
-4. 승인된 운영 경로에서 `/sbh/platform/demo/backend/DATABASE_URL`을 SecureString으로 등록해요. 기본 `aws/ssm` 키를 사용하면 ECS 실행 역할에 추가 KMS 권한은 필요하지 않아요. 값은 실제 앱 사용자, URL 인코딩된 비밀번호, RDS Writer 주소와 DB 이름을 사용해 `postgresql+psycopg://<앱 사용자>:<URL 인코딩된 암호>@<DB 주소>:5432/<DB 이름>?sslmode=require` 형식으로 만들어요. 예약 문자 `@`, `:`, `/`, `?`, `#` 등은 비밀번호 안에서 URL 인코딩해야 해요. 값과 비밀번호를 Terraform 변수, 출력, 명령행 인자와 로그에 넣지 마세요. 고객 관리 KMS 키를 사용한다면 해당 키의 `kms:Decrypt` 권한을 실행 역할에 추가한 뒤 배포해요.
-5. 값 자체를 조회하지 않는 아래 명령으로 Parameter의 Name, Type과 KeyId를 확인해요. 현재 조회 결과에는 지정 Parameter가 없었으므로 첫 배포 전에 반드시 등록 여부를 다시 확인해야 해요. 이름과 Type이 맞아도 URL 내용과 DB 연결 성공은 별도로 검증해야 해요.
+4. Terraform이 `/sbh/platform/demo/backend/DATABASE_URL`을 Standard SecureString으로 생성한 뒤 운영 경로에서 기존 Parameter의 초기값 `NOT_CONFIGURED`를 실제 접속값으로 갱신해요. 기본 `aws/ssm` 키를 사용하면 ECS 실행 역할에 추가 KMS 권한은 필요하지 않아요. 값은 실제 앱 사용자, URL 인코딩된 비밀번호, RDS Writer 주소와 DB 이름을 사용해 `postgresql+psycopg://<앱 사용자>:<URL 인코딩된 암호>@<DB 주소>:5432/<DB 이름>?sslmode=require` 형식으로 만들어요. 예약 문자 `@`, `:`, `/`, `?`, `#` 등은 비밀번호 안에서 URL 인코딩해야 해요. 값과 비밀번호를 Terraform 변수, 출력, 명령행 인자와 로그에 넣지 마세요. Terraform이 관리하지 않는 같은 이름의 Parameter가 이미 있으면 생성은 실패해요. 이때 기존 값을 덮어쓰거나 Parameter를 삭제하지 말고 별도 편입 설계를 검토해요.
+5. 값 자체를 조회하지 않는 아래 명령으로 Parameter의 Name, Type과 KeyId를 확인해요. 생성 전에는 지정 Parameter가 없을 수 있어요. 리소스가 존재해도 초기값 상태일 수 있으므로 실제 URL 갱신과 DB 연결 성공은 별도로 검증해야 해요.
 
    ```sh
    aws --profile sbh-platform --region ap-northeast-2 ssm describe-parameters \
@@ -33,6 +33,8 @@
 10. CloudFront HTTPS 주소에서 SPA 직접 접근, 인증 헤더, 쿠키, Query String, POST/PATCH/DELETE와 API 4xx/5xx 응답을 검증해요. ALB Host와 전송 구간은 내부 HTTP예요. 앱의 공개 URL과 신뢰할 프록시/HTTPS 인식 설정을 CloudFront에 맞춰 구성하고 로그인 Redirect와 Secure Cookie를 확인해요.
 
 Terraform의 AWS 실행은 `sbh-platform` 프로필을 사용해요. AWS CLI의 운영 확인 명령에도 `--profile sbh-platform --region ap-northeast-2`를 붙여요.
+
+Parameter의 값과 메타데이터는 최초 생성 이후 운영자가 관리해요. Terraform은 `value_wo`로 값을 State에 저장하지 않지만 현재 Provider는 refresh 시 `GetParameter`를 복호화 옵션으로 호출해요. `ignore_changes`로 값 갱신 번호와 값 쓰기를 유발하는 메타데이터 변경을 무시하고, 태그만 갱신해요. `overwrite = false`와 `prevent_destroy = true`를 유지하며 이름, 유형, 등급, 키, 설명 변경과 삭제는 별도 설계 및 승인으로 다뤄요. 고객 관리 KMS 키로 바꾸려면 키 정책과 실행 역할의 `kms:Decrypt` 권한을 함께 검토하세요.
 
 ## CI/CD 인프라 출력 계약
 

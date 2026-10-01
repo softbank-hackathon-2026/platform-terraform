@@ -31,6 +31,14 @@ mock_provider "aws" {
   mock_resource "aws_iam_policy" {
     defaults = { arn = "arn:aws:iam::123456789012:policy/sbh-platform-dev-policy-ecs-execution" }
   }
+  mock_resource "aws_ssm_parameter" {
+    defaults = {
+      arn            = "arn:aws:ssm:ap-northeast-2:123456789012:parameter/sbh/platform/demo/backend/DATABASE_URL"
+      has_value_wo   = true
+      value          = null
+      insecure_value = null
+    }
+  }
   mock_resource "aws_ecs_cluster" {
     defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:cluster/sbh-platform-dev-ecs-api" }
   }
@@ -156,6 +164,7 @@ run "infrastructure_only" {
       output.backend.target_group_arn == module.alb.target_group_arns["api"] &&
       output.backend.container_name == "app" && output.backend.container_port == 8000 &&
       output.database.database_url_parameter_arn == "arn:aws:ssm:ap-northeast-2:123456789012:parameter/sbh/platform/demo/backend/DATABASE_URL" &&
+      output.database.database_url_parameter_arn == aws_ssm_parameter.database_url.arn &&
       output.database.master_secret_arn != null &&
       output.frontend.url == "https://sbh.howon.me" &&
       module.cloudfront.domain_name == "test-platform.cloudfront.net" &&

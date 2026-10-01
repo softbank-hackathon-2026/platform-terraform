@@ -32,7 +32,7 @@ def check_plan(plan, port, health_path):
         "aws_iam_role", "aws_iam_policy",
         "aws_ecr_repository", "aws_s3_bucket",
         "aws_cloudfront_distribution", "aws_cloudfront_vpc_origin", "aws_cloudfront_function",
-        "aws_acm_certificate",
+        "aws_acm_certificate", "aws_ssm_parameter",
     }
     required_tags = {
         "Project": "SBH", "Scope": "platform", "Environment": "dev",
@@ -91,7 +91,14 @@ def check_plan(plan, port, health_path):
         require(db.get(key) == value, f"RDS {key} mismatch")
     require(db.get("password") is None and db.get("password_wo") is None, "No DB password may be stored")
     require(attrs("module.database.aws_db_subnet_group.this")["subnet_ids"] == ["subnet-db-a", "subnet-db-c"], "RDS must use DB subnets only")
-    require(not of_type("aws_secretsmanager_secret") and not of_type("aws_secretsmanager_secret_version") and not of_type("aws_ssm_parameter"), "Terraform must not manage app credential values or metadata")
+    require(not of_type("aws_secretsmanager_secret") and not of_type("aws_secretsmanager_secret_version"), "Terraform must not manage app Secrets Manager credentials")
+    require(len(of_type("aws_ssm_parameter")) == 1, "Expected only the DATABASE_URL parameter")
+    parameter = attrs("aws_ssm_parameter.database_url")
+    require(parameter["name"] == "/sbh/platform/demo/backend/DATABASE_URL", "DATABASE_URL parameter path mismatch")
+    require(parameter["type"] == "SecureString" and parameter["tier"] == "Standard", "DATABASE_URL must be a Standard SecureString")
+    require(parameter["data_type"] == "text" and parameter["key_id"] == "alias/aws/ssm", "DATABASE_URL encryption or data type mismatch")
+    require(parameter["overwrite"] is False and parameter["value_wo_version"] == 1, "Existing values must not be overwritten")
+    require(all(parameter.get(key) is None for key in ("value", "insecure_value", "value_wo")), "Parameter values must not be persisted in the plan")
 
     ingress = of_type("aws_vpc_security_group_ingress_rule")
     egress = of_type("aws_vpc_security_group_egress_rule")
@@ -101,6 +108,7 @@ def check_plan(plan, port, health_path):
     policy = json.loads(attrs("module.execution_policy.aws_iam_policy.this")["policy"])
     statements = {s["Sid"]: s for s in policy["Statement"]}
     parameter_arn = "arn:aws:ssm:ap-northeast-2:123456789012:parameter/sbh/platform/demo/backend/DATABASE_URL"
+    require(parameter["arn"] == parameter_arn, "Created parameter and IAM/output ARN must match")
     require(set(statements) == {"EcrLogin", "PullBackendImage", "WriteTaskLogs", "ReadApplicationDatabaseUrl"}, "Unexpected execution role permissions")
     require(statements["ReadApplicationDatabaseUrl"]["Action"] == ["ssm:GetParameters"] and statements["ReadApplicationDatabaseUrl"]["Resource"] == parameter_arn, "Execution role must read only the DATABASE_URL parameter")
     require(statements["PullBackendImage"]["Resource"] == attrs("module.ecr.aws_ecr_repository.this")["arn"], "Image access must be scoped to backend ECR")

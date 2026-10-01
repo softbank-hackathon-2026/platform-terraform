@@ -10,9 +10,10 @@ locals {
     ManagedBy   = "terraform"
     Owner       = "정호원"
   })
-  app_subnet_ids             = [module.network.private_subnet_ids["app_a"], module.network.private_subnet_ids["app_c"]]
-  db_subnet_ids              = [module.network.private_subnet_ids["db_a"], module.network.private_subnet_ids["db_c"]]
-  database_url_parameter_arn = "arn:${data.aws_partition.current.partition}:ssm:ap-northeast-2:${data.aws_caller_identity.current.account_id}:parameter/sbh/platform/demo/backend/DATABASE_URL"
+  app_subnet_ids              = [module.network.private_subnet_ids["app_a"], module.network.private_subnet_ids["app_c"]]
+  db_subnet_ids               = [module.network.private_subnet_ids["db_a"], module.network.private_subnet_ids["db_c"]]
+  database_url_parameter_name = "/sbh/platform/demo/backend/DATABASE_URL"
+  database_url_parameter_arn  = "arn:${data.aws_partition.current.partition}:ssm:ap-northeast-2:${data.aws_caller_identity.current.account_id}:parameter${local.database_url_parameter_name}"
 }
 
 module "network" {
