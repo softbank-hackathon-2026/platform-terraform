@@ -36,7 +36,7 @@ CI/CD는 이 인프라가 준비된 후 이미지 Digest로 Fargate Task Definit
 | `health_check_path` | `string` | `"/api/health"` | ALB가 HTTP 200을 확인할 경로예요. |
 | `postgres_engine_version` | `string` | `"17.11"` | PostgreSQL 버전이에요. 변경 시 리전 지원을 다시 확인하세요. |
 | `postgres_instance_class` | `string` | `"db.t4g.small"` | DB 인스턴스 클래스예요. |
-| `db_name` | `string` | `"sbhapp"` | 초기 데이터베이스 이름이에요. |
+| `db_name` | `string` | `"freesia"` | 초기 데이터베이스 이름이에요. |
 | `tags` | `map(string)` | `{}` | 추가 공통 태그예요. 빈 값, 필수 태그와 `Name`의 재정의, 공통 `ApplicationId`와 `DeploymentId`는 거부해요. `InfraId`는 정확한 대소문자를 사용해요. |
 
 ## 네이밍과 태깅
@@ -89,7 +89,7 @@ CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가
 
 Parameter 이름은 `/sbh/platform/demo/backend/DATABASE_URL`이고 유형은 SecureString이에요. 실제 값은 Terraform에서 생성하거나 읽지 않아요. 첫 서비스 활성화 전에 승인된 운영 경로에서 기본 `aws/ssm` 키로 등록하고, 현재 DB 주소와 `db_name`을 사용해 `postgresql+psycopg://<앱 사용자>:<URL 인코딩된 암호>@<DB 주소>:5432/<DB 이름>?sslmode=require` 형식으로 구성해요. 비밀번호의 예약 문자는 URL 인코딩해야 해요. 고객 관리 KMS 키를 쓰면 ECS 실행 역할에 해당 키의 `kms:Decrypt` 권한이 추가로 필요해요.
 
-현재 기본 DB 이름은 `sbhapp`이에요. 앱 사용자는 RDS 관리자 계정과 별도로 만들어야 해요. Parameter 값, 비밀번호와 DB 접속 URL을 tfvars, Terraform 출력, Plan이나 명령행 인자에 넣지 마세요. 등록과 마이그레이션 Task의 선행 조건은 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)을 따라 확인해요.
+현재 기본 DB 이름은 `freesia`예요. 앱 사용자는 RDS 관리자 계정과 별도로 만들어야 해요. Parameter 값, 비밀번호와 DB 접속 URL을 tfvars, Terraform 출력, Plan이나 명령행 인자에 넣지 마세요. 등록과 마이그레이션 Task의 선행 조건은 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)을 따라 확인해요.
 
 ## Backend와 실제 Plan
 

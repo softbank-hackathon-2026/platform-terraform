@@ -8,7 +8,7 @@
 
 1. `sbh-platform` 인증, 서울 리전과 기존 S3 Backend를 확인해요. State Key는 dev 전용으로 유지해요. `AWS_PROFILE=sbh-platform ./tf dev plan`에서 변경과 삭제, 활성 AZ별 비용이 발생하는 Regional NAT 1개, ALB, RDS Multi-AZ를 검토해요.
 2. 후속 Apply 승인 후 인프라 준비 구성을 적용해요. Terraform은 ECS Cluster와 로그 그룹을 만들지만 Task Definition과 Service는 만들지 않아요. CI/CD가 서비스를 배포하기 전에는 ALB Target이 비어 있으므로 `/api`의 503은 예상 상태예요.
-3. VPC 내부에서 DB에 접속할 수 있는 별도 관리 경로를 준비해요. 현재 Terraform에는 DB 접근용 공개 포트, Bastion과 관리자 ECS Task가 없어요. RDS 관리자 Secret으로 접속해 실제 `db_name`의 앱 전용 사용자를 만들고 필요한 스키마 권한만 부여해요. 관리자 계정을 앱에서 사용하지 않아요. 현재 기본 DB 이름은 `sbhapp`이에요.
+3. VPC 내부에서 DB에 접속할 수 있는 별도 관리 경로를 준비해요. 현재 Terraform에는 DB 접근용 공개 포트, Bastion과 관리자 ECS Task가 없어요. RDS 관리자 Secret으로 접속해 실제 `db_name`의 앱 전용 사용자를 만들고 필요한 스키마 권한만 부여해요. 관리자 계정을 앱에서 사용하지 않아요. 현재 기본 DB 이름은 `freesia`예요.
 4. 승인된 운영 경로에서 `/sbh/platform/demo/backend/DATABASE_URL`을 SecureString으로 등록해요. 기본 `aws/ssm` 키를 사용하면 ECS 실행 역할에 추가 KMS 권한은 필요하지 않아요. 값은 실제 앱 사용자, URL 인코딩된 비밀번호, RDS Writer 주소와 DB 이름을 사용해 `postgresql+psycopg://<앱 사용자>:<URL 인코딩된 암호>@<DB 주소>:5432/<DB 이름>?sslmode=require` 형식으로 만들어요. 예약 문자 `@`, `:`, `/`, `?`, `#` 등은 비밀번호 안에서 URL 인코딩해야 해요. 값과 비밀번호를 Terraform 변수, 출력, 명령행 인자와 로그에 넣지 마세요. 고객 관리 KMS 키를 사용한다면 해당 키의 `kms:Decrypt` 권한을 실행 역할에 추가한 뒤 배포해요.
 5. 값 자체를 조회하지 않는 아래 명령으로 Parameter의 Name, Type과 KeyId를 확인해요. 현재 조회 결과에는 지정 Parameter가 없었으므로 첫 배포 전에 반드시 등록 여부를 다시 확인해야 해요. 이름과 Type이 맞아도 URL 내용과 DB 연결 성공은 별도로 검증해야 해요.
 

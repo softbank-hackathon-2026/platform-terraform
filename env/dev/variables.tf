@@ -56,7 +56,7 @@ variable "postgres_instance_class" {
 variable "db_name" {
   description = "초기 PostgreSQL 데이터베이스 이름입니다."
   type        = string
-  default     = "sbhapp"
+  default     = "freesia"
 
   validation {
     condition     = can(regex("^[A-Za-z][A-Za-z0-9_]{0,62}$", var.db_name))

@@ -6,13 +6,13 @@
 
 | 구분 | 상태 |
 |---|---|
-| Ideation | 최초 계획과 후속 Unit 5~8 범위 승인 |
-| Inception | 최초 계획과 후속 Unit 5~8 요구사항 승인 |
-| Construction | Unit 1~8 구현과 Review 완료. dev Task Definition과 Service는 CI/CD 소유로 변경 |
-| 로컬 검증 | 최신 Unit 8 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 8에서 재실행하지 않음 |
-| 실제 AWS Plan | Unit 8 변경 후 `sbh-platform`, 서울, S3 Backend에서 46 add / 0 change / 0 destroy. Task Definition과 Service 없음 |
+| Ideation | 최초 계획과 후속 Unit 5~9 범위 승인 |
+| Inception | 최초 계획과 후속 Unit 5~9 요구사항 승인 |
+| Construction | Unit 1~9 구현과 Review 완료. dev Task Definition과 Service는 CI/CD 소유로 변경 |
+| 로컬 검증 | 최신 Unit 9 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 9에서 재실행하지 않음 |
+| 실제 AWS Plan | Unit 9 변경 후 `sbh-platform`, 서울, S3 Backend에서 46 add / 0 change / 0 destroy. DB 이름 `freesia`, 교체 없음 |
 | Apply와 배포 | 사용자 지시로 수행하지 않음 |
-| 커밋과 푸시 | 기존 구현과 후속 Unit 5~8의 원격 반영 확인. Unit 7과 8의 구현 커밋 `2886bd4` 원격 main 확인 |
+| 커밋과 푸시 | 기존 구현과 후속 Unit 5~8의 원격 반영 확인. Unit 9는 로컬 변경이며 커밋과 푸시 미수행 |
 
 초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit 5와 6의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
 
@@ -339,3 +339,47 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 | 2026-10-01 | `git diff --cached --check`, `git diff --cached --name-only` | 공백 오류 없음, 검토한 10개 파일만 스테이징 확인 |
 | 2026-10-01 | `git commit -m 'feat: hand off dev ECS deployment and use SSM DATABASE_URL'`, `git push origin main` | 구현 커밋 `2886bd4292bbe18bbe1ba1daea5107e74af04b10` 푸시 완료 |
 | 2026-10-01 | `git ls-remote origin refs/heads/main` | 원격 SHA `2886bd4292bbe18bbe1ba1daea5107e74af04b10`으로 로컬 구현 커밋과 일치 |
+
+## 후속 변경: dev 초기 DB 이름 freesia
+
+### Ideation: 승인됨
+
+- 문제 정의: dev PostgreSQL의 초기 DB 이름 기본값은 `sbhapp`이고 사용자가 요청한 이름은 `freesia`입니다. dev README와 Runbook에도 이전 기본값이 적혀 있습니다.
+- 사용자: dev 인프라와 백엔드 담당자입니다.
+- 성공 기준: dev 기본값이 `freesia`이고 RDS 입력과 `database.name` 출력 및 운영 문서가 일치합니다. 실제 AWS Plan에서 의도하지 않은 삭제나 교체가 없어야 합니다.
+- Scope: dev Root Module의 기본값, 기존 결합 Plan 검사, dev README와 Runbook, AI-DLC 및 프로젝트 진행 상태입니다.
+- Non-goals: 재사용 RDS 모듈의 기본값 변경, 기존 DB 데이터나 이름의 직접 변경, `DATABASE_URL` 값 등록, Terraform Apply와 배포, 커밋과 푸시입니다.
+- 승인: 2026-10-01 사용자가 위 dev DB 이름 변경 범위에 `ㄱㄱ`로 답해 Ideation 진행을 승인했습니다.
+
+### Inception: 승인됨
+
+- Functional Requirements: `env/dev`의 `db_name` 기본값을 `freesia`로 설정합니다. 기존 `module.database.db_name = var.db_name`과 `database.name = var.db_name` 경로를 유지하고, 문서에 표시된 기본값을 맞춥니다.
+- Non-Functional Requirements: `db_name` 재정의 기능과 검증 규칙을 유지합니다. 비밀값을 Terraform이나 검증 기록에 넣지 않습니다. 현재 인프라와 배포 소유 경계를 바꾸지 않습니다.
+- Architecture: dev 변수 → 재사용 RDS 모듈의 `aws_db_instance.primary.db_name`; 같은 변수 → `database.name` 출력입니다. DB 접속 URL은 Terraform 밖의 SSM SecureString 값으로 관리합니다.
+- Unit of Work: 단일 Unit 9에서 기본값, 기존 결합 검사, 관련 문서와 실제 AWS Plan 검토를 처리합니다.
+- Acceptance Criteria: 기본 dev mock Plan의 RDS `db_name`과 `database.name` 출력이 `freesia`이고 fmt, validate 및 결합 Plan 검사가 통과합니다. 실제 AWS Plan의 생성, 변경, 삭제와 교체 여부를 확인합니다. 기존 리소스의 삭제나 교체가 보이면 구현을 멈추고 별도 검토합니다. Apply와 배포는 수행하지 않습니다.
+
+### Construction Unit 9: Design과 Implementation Plan 승인됨
+
+- Design: `env/dev/variables.tf`의 기본값만 변경하고 기존 전달 경로를 재사용합니다. 새 추상화나 재사용 모듈 변경은 필요하지 않습니다. 기존 `scripts/check-dev-test-plan.py`에서 RDS 계획값과 dev 출력값을 확인합니다.
+- Implementation Plan: 변수 기본값, 결합 Plan 검사, dev README와 Runbook의 기본 이름을 갱신합니다. fmt, validate, dev mock과 전체 Plan 검사 후 `sbh-platform` 실제 AWS Plan을 실행하고 삭제 및 교체를 검토합니다. 승인된 단계와 검증 결과를 이 문서 및 `docs/README.md`에 기록합니다.
+- Approval: 2026-10-01 사용자가 `ㄱㄱ`로 Inception과 Unit 9의 Design 및 Implementation Plan을 승인했습니다. 실제 AWS Plan까지 포함하며 Apply, 배포, 커밋과 푸시는 포함하지 않습니다.
+- Implementation: `env/dev/variables.tf`의 `db_name` 기본값을 `freesia`로 변경했습니다. 기존 RDS 입력과 출력 연결은 유지하고 전체 Plan 검사에 두 값의 일치 확인을 추가했습니다. dev README와 Runbook의 기본 이름을 갱신했습니다.
+- Test: fmt, validate와 Python 구문 검사가 통과했습니다. dev mock 4개와 기본 및 재정의 포트의 전체 Plan 검사 2개가 통과했고 RDS 입력과 출력이 모두 `freesia`임을 확인했습니다.
+- Review: 실제 AWS Plan은 46개 생성, 변경과 삭제 0개입니다. 계획된 RDS의 `db_name`과 `database.name` 출력이 `freesia`이며 교체, Terraform 관리 ECS Service 및 Task Definition, SSM Parameter 생성이 없습니다. 현재 Terraform State의 관리 리소스 목록은 비어 있습니다.
+- Operation: Runbook에 새 기본 이름을 반영했습니다. 실제 DB 생성, 기존 데이터 변경, `DATABASE_URL` 값 등록, Apply와 배포는 수행하지 않았습니다.
+- Git: Unit 9 변경은 로컬 작업 트리에 있으며 커밋과 푸시는 수행하지 않았습니다.
+
+### Unit 9 사전 확인 기록
+
+| 날짜 | 명령 | 결과 |
+|---|---|---|
+| 2026-10-01 | `rg -n 'sbhapp|freesia|db_name' --glob '!*.tfplan*' .` | 문서 제안 추가 전 `sbhapp`은 dev 변수 기본값과 dev README, Runbook에만 사용. RDS 모듈은 입력값을 그대로 전달 |
+| 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev state list` | 현재 State의 관리 리소스 목록 빈 결과. 실제 AWS Plan은 아직 실행하지 않음 |
+| 2026-10-01 | `git status --short` | 문서 제안 추가 전 작업 트리 변경 없음. Unit 9 구현 미시작 |
+| 2026-10-01 | `terraform fmt -check -recursive env/dev`, Python AST 구문 검사, `git diff --check` | PASS |
+| 2026-10-01 | `terraform -chdir=env/dev validate -no-color` | 허용된 환경에서 PASS |
+| 2026-10-01 | `.local/terraform-1.17.0-beta2/terraform -chdir=env/dev test -test-directory=tests-terraform-1.17 -no-color -verbose -json > .local/dev-db-name-tests.jsonl` | mock 4 PASS / 0 FAIL |
+| 2026-10-01 | `python3 scripts/check-dev-test-plan.py .local/dev-db-name-tests.jsonl` | 기본 및 재정의 포트의 전체 Plan 검사 2개 PASS, RDS 입력과 출력 이름 `freesia` 확인 |
+| 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-db-name.tfplan > .local/dev-db-name-plan.log` | 종료 코드 2, 46 add / 0 change / 0 destroy |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-db-name.tfplan > .local/dev-db-name.tfplan.json` 및 Python 인라인 검사 | RDS `db_name`과 출력 `database.name`이 `freesia`, 생성 46개, 변경과 삭제 및 교체 없음 |

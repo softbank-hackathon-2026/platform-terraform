@@ -78,6 +78,7 @@ def check_plan(plan, port, health_path):
 
     db = attrs("module.database.aws_db_instance.primary")
     require(len(of_type("aws_db_instance")) == 1, "Standby must not be modeled as a read replica")
+    require(db["db_name"] == "freesia", "RDS initial database name must be freesia")
     for key, value in {
         "engine": "postgres", "engine_version": "17.11", "instance_class": "db.t4g.small",
         "multi_az": True, "storage_type": "gp3", "allocated_storage": 20,
@@ -142,6 +143,7 @@ def check_plan(plan, port, health_path):
     require(backend["container_name"] == "app" and backend["container_port"] == port, "Container handoff mismatch")
     require(plan["output_changes"]["network"]["after"]["app_subnet_ids"] == ["subnet-app-a", "subnet-app-c"], "App subnet handoff mismatch")
     require(plan["output_changes"]["database"]["after"]["database_url_parameter_arn"] == parameter_arn, "SSM handoff mismatch")
+    require(plan["output_changes"]["database"]["after"]["name"] == "freesia", "Database output name must be freesia")
 
 
 def main(path):
