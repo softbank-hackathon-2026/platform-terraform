@@ -12,7 +12,7 @@
 | 로컬 검증 | 최신 Unit 8 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 8에서 재실행하지 않음 |
 | 실제 AWS Plan | Unit 8 변경 후 `sbh-platform`, 서울, S3 Backend에서 46 add / 0 change / 0 destroy. Task Definition과 Service 없음 |
 | Apply와 배포 | 사용자 지시로 수행하지 않음 |
-| 커밋과 푸시 | 기존 구현과 후속 Unit 5, 6은 원격 반영 확인. Unit 7과 8은 로컬 변경이며 커밋과 푸시 미수행 |
+| 커밋과 푸시 | 기존 구현과 후속 Unit 5~8의 원격 반영 확인. Unit 7과 8의 구현 커밋 `2886bd4` 원격 main 확인 |
 
 초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit 5와 6의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
 
@@ -278,7 +278,7 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 - Test: `terraform fmt`와 허용된 환경의 `terraform validate`가 통과했습니다. dev 결합 mock 6개와 전체 Plan 점검 3개가 통과했고, 활성 구성에서 정확한 Secret ARN과 실행 역할의 `ssm:GetParameters`, 이전 앱 Secret 부재를 확인했습니다.
 - Review: 실제 AWS Plan은 46개 생성, 변경과 삭제 0개입니다. Backend State 파일은 존재하지만 `state list`의 관리 리소스는 비어 있습니다. Plan JSON에는 SSM ARN 출력만 있고 Parameter 값, 앱 Secret 리소스와 평문 DB URL은 없습니다. 초기 구성이라 ECS Task Definition과 Service가 없으며 실행 IAM 정책 본문도 ECR ARN이 미정이어서 실제 Plan에서는 확정되지 않습니다. 활성 Task 참조와 정책의 정확한 ARN은 mock Plan으로 확인했습니다.
 - Operation: Runbook에 앱 계정 생성 뒤 외부 SecureString 등록, 메타데이터 사전 확인, 별도 마이그레이션 Task의 선행 조건, 값 교체 후 Task 재시작을 기록했습니다. 2026-10-01 조회 시 Parameter는 아직 존재하지 않았습니다. Apply, 값 등록, 배포와 DB 접속 검증은 수행하지 않았습니다.
-- Git: Unit 7 변경은 로컬 작업 트리에 있으며 커밋과 푸시는 수행하지 않았습니다.
+- Git: 후속 요청으로 Unit 7과 8의 구현 변경을 커밋 `2886bd4`로 `main`에 푸시하고 원격 SHA 일치를 확인했습니다.
 
 ### Unit 7 검증 기록
 
@@ -324,7 +324,7 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 - Test: `terraform fmt`와 허용된 환경의 `terraform validate`, dev mock 4개와 전체 Plan 점검 2개가 통과했습니다. 기본 포트 8000과 재정의 포트 9090에서 ALB 및 보안 그룹 연결, CI/CD 출력 계약과 Task Definition 및 Service 부재를 확인했습니다.
 - Review: 실제 AWS Plan은 46개 생성, 변경과 삭제 0개입니다. Plan JSON에 Terraform 관리 Task Definition, Service, 앱 Secret과 SSM 값 리소스가 없고 이미지 Digest 입력도 없습니다. CI/CD 인수인계 출력과 비밀값 없는 SSM ARN을 확인했습니다. Parameter 값의 존재, CI/CD 동작과 실제 서비스 배포는 검증하지 않았습니다.
 - Operation: Runbook에 Terraform 인프라 Apply 이후 CI/CD의 Task Definition 등록, 마이그레이션 Task, Service 생성 및 후속 revision 갱신 순서와 AZ 재분산 및 배포 Circuit Breaker 설정을 기록했습니다. Apply와 배포는 수행하지 않았습니다.
-- Git: Unit 7과 8 변경은 로컬 작업 트리에 있으며 커밋과 푸시는 수행하지 않았습니다.
+- Git: 후속 요청으로 Unit 7과 8의 구현 변경을 커밋 `2886bd4`로 `main`에 푸시하고 원격 SHA 일치를 확인했습니다.
 
 ### Unit 8 검증 기록
 
@@ -336,3 +336,6 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 | 2026-10-01 | `python3 scripts/check-dev-test-plan.py .local/dev-cicd-ownership-tests.jsonl` | 기본 포트와 재정의 포트 전체 Plan 검사 2 PASS |
 | 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-cicd-ownership.tfplan > .local/dev-cicd-ownership-plan.log` | 종료 코드 2, 46 add / 0 change / 0 destroy |
 | 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-cicd-ownership.tfplan > .local/dev-cicd-ownership.tfplan.json` 후 Python 인라인 검사 | 허용된 환경에서 JSON 변환, Terraform 관리 Task Definition과 Service 부재, CI/CD 출력, 삭제 및 평문 DB URL 부재 확인 |
+| 2026-10-01 | `git diff --cached --check`, `git diff --cached --name-only` | 공백 오류 없음, 검토한 10개 파일만 스테이징 확인 |
+| 2026-10-01 | `git commit -m 'feat: hand off dev ECS deployment and use SSM DATABASE_URL'`, `git push origin main` | 구현 커밋 `2886bd4292bbe18bbe1ba1daea5107e74af04b10` 푸시 완료 |
+| 2026-10-01 | `git ls-remote origin refs/heads/main` | 원격 SHA `2886bd4292bbe18bbe1ba1daea5107e74af04b10`으로 로컬 구현 커밋과 일치 |
