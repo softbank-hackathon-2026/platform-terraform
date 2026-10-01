@@ -12,7 +12,7 @@
 | 로컬 검증 | 최신 Unit 9 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 9에서 재실행하지 않음 |
 | 실제 AWS Plan | Unit 9 변경 후 `sbh-platform`, 서울, S3 Backend에서 46 add / 0 change / 0 destroy. DB 이름 `freesia`, 교체 없음 |
 | Apply와 배포 | 사용자 지시로 수행하지 않음 |
-| 커밋과 푸시 | 기존 구현과 후속 Unit 5~8의 원격 반영 확인. Unit 9는 로컬 변경이며 커밋과 푸시 미수행 |
+| 커밋과 푸시 | 기존 구현과 후속 Unit 5~9의 원격 반영 확인. Unit 9 구현 커밋 `c0df773` 원격 main 확인 |
 
 초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit 5와 6의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
 
@@ -368,7 +368,7 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 - Test: fmt, validate와 Python 구문 검사가 통과했습니다. dev mock 4개와 기본 및 재정의 포트의 전체 Plan 검사 2개가 통과했고 RDS 입력과 출력이 모두 `freesia`임을 확인했습니다.
 - Review: 실제 AWS Plan은 46개 생성, 변경과 삭제 0개입니다. 계획된 RDS의 `db_name`과 `database.name` 출력이 `freesia`이며 교체, Terraform 관리 ECS Service 및 Task Definition, SSM Parameter 생성이 없습니다. 현재 Terraform State의 관리 리소스 목록은 비어 있습니다.
 - Operation: Runbook에 새 기본 이름을 반영했습니다. 실제 DB 생성, 기존 데이터 변경, `DATABASE_URL` 값 등록, Apply와 배포는 수행하지 않았습니다.
-- Git: Unit 9 변경은 로컬 작업 트리에 있으며 커밋과 푸시는 수행하지 않았습니다.
+- Git: 후속 요청으로 Unit 9 구현 변경을 커밋 `c0df773`으로 `main`에 푸시하고 원격 SHA 일치를 확인했습니다.
 
 ### Unit 9 사전 확인 기록
 
@@ -383,3 +383,6 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 | 2026-10-01 | `python3 scripts/check-dev-test-plan.py .local/dev-db-name-tests.jsonl` | 기본 및 재정의 포트의 전체 Plan 검사 2개 PASS, RDS 입력과 출력 이름 `freesia` 확인 |
 | 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-db-name.tfplan > .local/dev-db-name-plan.log` | 종료 코드 2, 46 add / 0 change / 0 destroy |
 | 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-db-name.tfplan > .local/dev-db-name.tfplan.json` 및 Python 인라인 검사 | RDS `db_name`과 출력 `database.name`이 `freesia`, 생성 46개, 변경과 삭제 및 교체 없음 |
+| 2026-10-01 | `git diff --cached --check`, `git diff --cached --name-only` | 공백 오류 없음, 검토한 6개 파일만 스테이징 확인 |
+| 2026-10-01 | `git commit -m 'fix: set dev database name to freesia'`, `git push origin main` | 구현 커밋 `c0df773501058de4b09291b3ce134b9b6d9e0a3d` 푸시 완료 |
+| 2026-10-01 | `git ls-remote origin refs/heads/main` | 원격 SHA `c0df773501058de4b09291b3ce134b9b6d9e0a3d`로 구현 커밋과 일치 |

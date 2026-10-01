@@ -61,7 +61,7 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 | dev Regional NAT와 private-only VPC | Unit 6 구현, Test와 Review 완료 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 47 add / 0 change / 0 destroy, Apply 미수행 | `main` 커밋과 푸시 완료, 원격 SHA 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-regional-nat와-private-only-vpc) |
 | dev `DATABASE_URL` Parameter Store | Unit 7 구현과 Review 완료. 값 등록은 별도 운영 작업 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 46 add / 0 change / 0 destroy, Parameter 미등록, Apply 미수행 | 구현 커밋 `2886bd4` 원격 main 확인 | [Unit 7](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-store-연동) |
 | dev ECS 배포 소유 경계 | Unit 8 구현과 Review 완료. Terraform은 기반 인프라, CI/CD는 Task Definition과 Service 소유 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, Task Definition과 Service 없음, Apply 미수행 | 구현 커밋 `2886bd4` 원격 main 확인 | [Unit 8](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-ecs-배포-소유-경계) |
-| dev 초기 DB 이름 `freesia` | Unit 9 구현과 Review 완료 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, RDS 이름 `freesia`, Apply 미수행 | Unit 9 로컬 변경, 커밋과 푸시 미수행 | [Unit 9](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia) |
+| dev 초기 DB 이름 `freesia` | Unit 9 구현과 Review 완료 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, RDS 이름 `freesia`, Apply 미수행 | 구현 커밋 `c0df773` 원격 main 확인 | [Unit 9](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia) |
 | 지속 문서화 | RDS, ECR 진행 상태 반영, 기존 10개 모듈 README의 입력, 출력 속성 표 정리와 향후 유지 규칙 추가 | 입력 97개, 출력 49개 코드 대조 및 문서 공백 점검 완료 | 해당 없음 | ECR, README 표, 규칙 커밋 `3f6dbdd` 원격 main 확인 | 이 문서 |
 
 IAM 구현 커밋 `2190a91`을 푸시한 직후 로컬 `HEAD`, `origin/main`, 원격 main의 SHA가 모두 `2190a91b4e6023492d71023f6c69a959d1a825b3`인 것을 확인했습니다.
@@ -154,7 +154,7 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ## 현재 작업과 다음 단계
 
-dev 초기 DB 이름을 `sbhapp`에서 `freesia`로 바꾸는 Unit 9 구현과 Review를 마쳤습니다. [AI-DLC 기록](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia)에 dev 기본값, 문서와 검증 결과를 남겼습니다. fmt, validate, dev mock 4개와 전체 Plan 점검 2개가 통과했고 실제 AWS Plan은 46 add / 0 change / 0 destroy, DB 이름 `freesia`입니다. 현재 Terraform State의 관리 리소스 목록은 비어 있습니다. Apply, 배포, 커밋과 푸시는 수행하지 않았습니다.
+dev 초기 DB 이름을 `sbhapp`에서 `freesia`로 바꾸는 Unit 9 구현과 Review를 마쳤습니다. [AI-DLC 기록](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia)에 dev 기본값, 문서와 검증 결과를 남겼습니다. fmt, validate, dev mock 4개와 전체 Plan 점검 2개가 통과했고 실제 AWS Plan은 46 add / 0 change / 0 destroy, DB 이름 `freesia`입니다. 현재 Terraform State의 관리 리소스 목록은 비어 있습니다. 후속 요청으로 구현 커밋 `c0df773`를 `main`에 푸시해 원격 SHA 일치를 확인했습니다. Apply와 배포는 수행하지 않았습니다.
 
 CI/CD가 dev Task Definition과 Service를 소유하고 Terraform은 ECS 기반 인프라만 관리하도록 [Unit 8 변경](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-ecs-배포-소유-경계)을 구현했습니다. 이미지 Digest 입력과 Terraform의 Task Definition 및 Service 생성 경로를 제거하고 인프라 출력 계약을 추가했습니다. mock 4개와 전체 Plan 점검 2개가 통과했고 실제 AWS Plan은 46 add / 0 change / 0 destroy입니다. 후속 요청으로 Unit 7과 8의 구현 커밋 `2886bd4`를 `main`에 푸시해 원격 SHA 일치를 확인했습니다. Apply와 CI/CD 배포는 수행하지 않았습니다.
 
