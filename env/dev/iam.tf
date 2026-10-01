@@ -40,6 +40,18 @@ module "execution_policy" {
         Action   = ["ssm:GetParameters"]
         Resource = local.database_url_parameter_arn
       },
+      {
+        Sid      = "ReadDeployCallbackSecret"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameters"]
+        Resource = "arn:aws:ssm:ap-northeast-2:723225040786:parameter/sbh/platform/demo/backend/DEPLOY_CALLBACK_SECRET"
+      },
+      {
+        Sid      = "ReadGithubDeployToken"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameters"]
+        Resource = "arn:aws:ssm:ap-northeast-2:723225040786:parameter/sbh/platform/demo/backend/GITHUB_DEPLOY_TOKEN"
+      },
     ]
   })
   tags = local.tags
