@@ -13,7 +13,7 @@
 | 실제 AWS Plan | 최종 0 add / 1 change / 0 destroy. RDS와 관리자 Secret/Version 및 출력은 no-op, 기존 CloudFront Origin 표현 차이만 남음 |
 | Apply | 초기 전환 및 Version 정밀도 수정 완료. DB와 Secret 컨테이너 유지, State 출력 refresh-only 적용 완료. 최종 serial 15, 관리 인스턴스 51개 |
 | DB 접속과 앱 배포 | 미수행, 별도 접근 경로와 앱 배포 범위 |
-| 커밋과 푸시 | 2026-10-01 후속 요청으로 승인, main 반영 진행 중 |
+| 커밋과 푸시 | 구현 및 검증 커밋 `b995fa7` main 푸시 완료, 원격 SHA 일치 확인 |
 
 사용자는 모드와 콘솔 변경 방법을 설명받은 뒤 `비관리형으로 바꾸고 적용해줘`라고 요청했습니다. 이 요청은 아래 Ideation, Inception, Unit 12 Construction과 Apply 승인으로 기록합니다. 초기 암호는 모듈이 생성해 새 Secret에 저장합니다. 사용자 지정 암호 입력은 포함하지 않습니다. 이후 2026-10-01 사용자가 `커밋 푸시`로 이번 코드와 문서의 main 반영을 추가 승인했습니다.
 
@@ -83,6 +83,9 @@
 | 2026-10-01 | `git diff --check`, 최종 `terraform fmt -check -recursive env/dev modules/rds/instance` | PASS |
 | 2026-10-01 | `git status --short --branch` | Git 승인 전 이번 코드와 문서의 로컬 변경 13개. 커밋 및 푸시 미수행 |
 | 2026-10-01 | 사용자 요청 `커밋 푸시` | 이번 코드와 문서의 main 커밋 및 푸시 승인 |
+| 2026-10-01 | `git diff --check`, `python3` 변경 문서 링크 및 앵커와 금지 문자 검사 | 공백 오류와 금지 문자 없음, 변경 파일 13개 및 상대 링크와 앵커 97개 확인 |
+| 2026-10-01 | 검토한 13개 파일 `git add`, `git diff --cached --check`, `git diff --cached --name-only`, `git commit -m 'feat: switch dev RDS to unmanaged credentials'` | 코드와 문서 13개만 커밋. 구현 및 검증 커밋 `b995fa7ff251ef52978e1ed4cb7d90be5486bc89` 생성 |
+| 2026-10-01 | `git push origin main`, `git ls-remote origin refs/heads/main`, `git rev-parse HEAD`, `git status --short --branch` | 원격 main과 로컬 HEAD SHA가 `b995fa7ff251ef52978e1ed4cb7d90be5486bc89`로 일치, 구현 푸시 직후 작업 트리 변경 없음 |
 
 ## 4. Operation
 
@@ -112,4 +115,4 @@
 
 기존 RDS Resource ID와 Writer 주소 및 DB 이름을 유지하고 비관리형 전환을 완료했습니다. 현재 DB는 `available`, 관리형 Secret 연결과 대기 변경이 없으며 새 관리자 Secret은 자동 회전 없이 활성 Version을 가집니다. Secret 컨테이너는 정밀도 수정 중에도 유지됐습니다. 두 write-only 버전 번호의 실제 State 정밀도와 출력 ARN을 확인했고, 최종 전체 Plan에서 DB와 Secret 반복 변경이 사라졌습니다. 이전 CloudFront 차이는 적용하지 않았습니다.
 
-비밀번호 본문을 직접 조회해 출력하거나 실제 DB에 로그인한 검증은 수행하지 않았습니다. 동일 초기 암호 전달은 모듈의 특정 Version 참조, DB 수정 Apply와 State의 Version 연결로 확인했습니다. VPC 내부 로그인, 콘솔 수동 변경, 앱 사용자 및 Parameter 값 등록과 앱 배포는 후속 운영 범위입니다. 이번 코드와 문서의 커밋 및 푸시는 사용자 후속 요청으로 승인받아 진행합니다.
+비밀번호 본문을 직접 조회해 출력하거나 실제 DB에 로그인한 검증은 수행하지 않았습니다. 동일 초기 암호 전달은 모듈의 특정 Version 참조, DB 수정 Apply와 State의 Version 연결로 확인했습니다. VPC 내부 로그인, 콘솔 수동 변경, 앱 사용자 및 Parameter 값 등록과 앱 배포는 후속 운영 범위입니다. 이번 코드와 문서는 커밋 `b995fa7ff251ef52978e1ed4cb7d90be5486bc89`으로 main에 푸시했고 원격 SHA 일치를 확인했습니다. Backend, State, Plan과 로컬 검증 산출물은 Git 제외 경로에 유지했습니다.

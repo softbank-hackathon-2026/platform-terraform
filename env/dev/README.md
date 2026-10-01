@@ -116,7 +116,7 @@ Terraform Plan은 잠금 파일을 잠시 생성하고 삭제할 수 있어요. 
 
 2026-10-01 Unit 11의 SSM 대상 지정 Plan 1 add / 0 change / 0 destroy를 승인받아 Apply했고 Parameter 하나를 생성했어요. AWS 메타데이터는 SecureString, Standard, `alias/aws/ssm`, 버전 1이에요. State의 값 비저장과 ARN 및 IAM 계약도 확인했어요. 적용 후 전체 Plan은 0 add / 1 change / 0 destroy로 Parameter 추가 변경이 없고 기존 CloudFront Origin 표현 차이만 남아요. Terraform 1.16.4로 수행했으며 실제 접속값 갱신과 DB 연결은 아직 검증하지 않았어요. [Unit 11 검증 기록](../../docs/ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-리소스-생성)에 명령과 결과를 정리했어요.
 
-2026-10-01 Unit 12의 비관리형 전환과 버전 정밀도 수정 Apply를 완료했어요. 기존 DB와 접속 주소 및 Secret 컨테이너를 유지했고 현재 DB는 `available`이에요. 모듈 mock 16개, dev mock 4개, 전체 mock Plan 점검 2개와 fmt 및 validate가 통과했어요. 초기 전환 뒤 반복 교체를 유발한 큰 버전 번호를 52비트로 수정했고 State와 실제 Plan에서 해소를 확인했어요. refresh-only로 새 Secret ARN 출력을 갱신해 최종 State는 serial 15, 관리 인스턴스 51개예요. 전체 Plan은 0 add / 1 change / 0 destroy로 기존 CloudFront 차이만 남아요. 실제 DB 로그인은 미수행이에요. 이번 변경의 커밋 및 푸시는 사용자 후속 요청으로 승인받아 진행해요.
+2026-10-01 Unit 12의 비관리형 전환과 버전 정밀도 수정 Apply를 완료했어요. 기존 DB와 접속 주소 및 Secret 컨테이너를 유지했고 현재 DB는 `available`이에요. 모듈 mock 16개, dev mock 4개, 전체 mock Plan 점검 2개와 fmt 및 validate가 통과했어요. 초기 전환 뒤 반복 교체를 유발한 큰 버전 번호를 52비트로 수정했고 State와 실제 Plan에서 해소를 확인했어요. refresh-only로 새 Secret ARN 출력을 갱신해 최종 State는 serial 15, 관리 인스턴스 51개예요. 전체 Plan은 0 add / 1 change / 0 destroy로 기존 CloudFront 차이만 남아요. 실제 DB 로그인은 미수행이에요. 이번 변경은 커밋 `b995fa7`으로 main에 푸시하고 원격 SHA 일치를 확인했어요.
 
 ## 로컬 검증
 
