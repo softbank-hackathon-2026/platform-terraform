@@ -12,7 +12,7 @@
 | 로컬 검증 | 최신 Unit 11 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 11에서 재실행하지 않음 |
 | 실제 AWS Plan | Unit 11 Apply 전 SSM 대상 지정 1 add / 0 change / 0 destroy. Apply 후 전체 Plan 0 add / 1 change / 0 destroy. SSM 추가 변경 없이 기존 CloudFront Origin 표현 차이만 남음 |
 | Apply와 배포 | Unit 11 Parameter 생성 Apply 완료, 1 added / 0 changed / 0 destroyed. 실제 접속값 등록과 앱 배포 미수행. 사용자 도메인 Unit 10은 별도 기록 참고 |
-| 커밋과 푸시 | Unit 11 Apply 기록까지 반영한 커밋과 푸시 진행 중 |
+| 커밋과 푸시 | Unit 11 구현과 Apply 기록의 커밋 `40d3ddb`을 main에 푸시하고 원격 SHA 일치 확인 |
 
 초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 Apply는 명시적으로 승인된 해당 Unit 범위에서만 수행합니다.
 
@@ -418,7 +418,7 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 - Test: fmt, validate 및 Python 구문 검사가 통과했습니다. dev mock 4개와 기본 및 재정의 포트의 전체 Plan 검사 2개가 통과했고 Parameter 리소스 하나, Standard SecureString, 기본 SSM 키, 값 비저장, ARN 및 IAM 계약을 확인했습니다. 최초 샌드박스 실행의 Provider handshake 실패는 허용된 환경에서 재실행해 해결했습니다. SPA 테스트는 이번 변경에서 재실행하지 않았습니다.
 - Review: Apply 전 지정 Parameter가 없음을 확인하고 새 SSM 대상 지정 Plan 1 add / 0 change / 0 destroy를 검토했습니다. Apply 결과는 1 added / 0 changed / 0 destroyed이며 AWS 메타데이터는 지정 경로, SecureString, Standard, `alias/aws/ssm`, 버전 1입니다. 적용 후 State serial 10, 관리 리소스 인스턴스 49개이며 Parameter의 `has_value_wo = true`, `value = ""`, `insecure_value = null`, `value_wo = null`로 비밀값이 저장되지 않았습니다. 실제 ARN과 출력 및 실행 정책도 일치합니다. 적용 후 전체 Plan은 0 add / 1 change / 0 destroy이고 Parameter는 no-op, 기존 CloudFront Origin 표현 차이만 남습니다. 운영자의 실제 접속값 갱신 이후 동작과 DB 접속은 미검증입니다.
 - Operation: 사용자 승인 후 검토한 저장 Plan으로 Parameter 리소스만 Apply했습니다. CloudFront와 기타 리소스는 변경하지 않았으며 대상 지정 경고에 따라 적용 후 전체 Plan을 확인했습니다. 실제 접속값 등록과 앱 배포는 미수행입니다. Runbook에 초기값 상태와 운영자의 값 갱신을 기록했습니다. CLI에서 비밀값을 출력하지 않았으며 Provider가 자체적으로 수행하는 refresh 조회는 별도 제약으로 기록했습니다.
-- Git: 구현과 Apply 검증 기록의 커밋 및 푸시를 진행합니다. Backend 설정과 State, Plan, Provider 및 테스트 CLI는 Git 제외 경로에 보관했습니다.
+- Git: 구현과 Apply 검증 기록을 커밋 `40d3ddbc7b1eb41611e4f1a7aa4ae71991a366e7`로 main에 푸시하고 원격 SHA 일치를 확인했습니다. Backend 설정과 State, Plan, Provider 및 테스트 CLI는 Git 제외 경로에 보관했습니다. 원격 확인 결과는 후속 문서 커밋에 기록합니다.
 
 ### Unit 11 사전 확인 기록
 
@@ -463,3 +463,6 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 | 2026-10-01 | `terraform -chdir=env/dev state pull > .local/dev-ssm-parameter-postapply.tfstate` 및 Python 검사 | serial 10, 관리 인스턴스 49개. SDK가 `value`를 null 대신 빈 문자열로 저장하는 점을 반영해 미저장 판별을 보정. 값 없음, write-only 플래그와 ARN 및 IAM 계약 일치 |
 | 2026-10-01 | `terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-ssm-parameter-postapply.tfplan > .local/dev-ssm-parameter-postapply-plan.log` | 종료 코드 2. 0 add / 1 change / 0 destroy |
 | 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-ssm-parameter-postapply.tfplan > .local/dev-ssm-parameter-postapply.tfplan.json` 및 Python 검사 | Parameter no-op 및 값 비저장. 기존 CloudFront Origin 표현 차이만 남으며 삭제와 교체 없음 |
+| 2026-10-01 | `git diff --check`, Python 인라인 문서 링크 및 앵커와 금지 문자 검사, `git check-ignore` | 공백 오류와 금지 문자 없음, 링크 및 앵커 80개 확인. 실제 Backend, State와 Plan은 Git 제외 |
+| 2026-10-01 | 변경 파일 9개 `git add`, `git diff --cached --check`, `git diff --cached --name-only`, `git commit -m 'feat: create dev DATABASE_URL parameter resource'` | 검토한 9개 파일만 커밋. 구현 및 Apply 검증 커밋 `40d3ddbc7b1eb41611e4f1a7aa4ae71991a366e7` |
+| 2026-10-01 | `git push origin main`, `git ls-remote origin refs/heads/main`, `git rev-parse HEAD`, `git status --short --branch` | 원격 main과 로컬 HEAD SHA가 `40d3ddbc7b1eb41611e4f1a7aa4ae71991a366e7`로 일치, 구현 푸시 직후 작업 트리 변경 없음 |
