@@ -45,7 +45,7 @@ resource "aws_vpc" "this" {
   enable_dns_support   = true
 
   tags = merge(var.tags, {
-    Name = var.name
+    Name = "${var.name}-vpc-shared"
   })
 
   lifecycle {
@@ -82,7 +82,7 @@ resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
   tags = merge(var.tags, {
-    Name = "${var.name}-igw"
+    Name = "${var.name}-igw-shared"
   })
 }
 
@@ -95,7 +95,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.this.id
 
   tags = merge(var.tags, {
-    Name = "${var.name}-${each.key}"
+    Name = "${var.name}-subnet-${replace(each.key, "_", "-")}"
   })
 }
 
@@ -108,7 +108,7 @@ resource "aws_subnet" "private" {
   vpc_id                  = aws_vpc.this.id
 
   tags = merge(var.tags, {
-    Name = "${var.name}-${each.key}"
+    Name = "${var.name}-subnet-${replace(each.key, "_", "-")}"
   })
 }
 
@@ -118,7 +118,7 @@ resource "aws_route_table" "public" {
   vpc_id = aws_vpc.this.id
 
   tags = merge(var.tags, {
-    Name = "${var.name}-public"
+    Name = "${var.name}-rt-public"
   })
 }
 
@@ -143,7 +143,7 @@ resource "aws_route_table" "private" {
   vpc_id = aws_vpc.this.id
 
   tags = merge(var.tags, {
-    Name = "${var.name}-${each.key}"
+    Name = "${var.name}-rt-${replace(each.key, "_", "-")}"
   })
 }
 
@@ -174,7 +174,7 @@ resource "aws_eip" "zonal" {
   domain = "vpc"
 
   tags = merge(var.tags, {
-    Name = "${var.name}-nat-${each.key}"
+    Name = "${var.name}-eip-nat-${replace(each.value, "_", "-")}"
   })
 }
 
@@ -187,7 +187,7 @@ resource "aws_nat_gateway" "zonal" {
   subnet_id         = aws_subnet.public[each.value].id
 
   tags = merge(var.tags, {
-    Name = "${var.name}-nat-${each.key}"
+    Name = "${var.name}-nat-${replace(each.value, "_", "-")}"
   })
 
   depends_on = [aws_internet_gateway.this]

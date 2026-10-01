@@ -84,6 +84,8 @@ resource "aws_lb_listener" "forward" {
     type             = "forward"
     target_group_arn = try(aws_lb_target_group.this[each.value.default_action.target_group_key].arn, null)
   }
+
+  tags = merge(var.tags, { Name = "${var.name}-listener-${each.key}" })
 }
 
 resource "aws_lb_listener" "redirect" {
@@ -105,6 +107,8 @@ resource "aws_lb_listener" "redirect" {
       status_code = "HTTP_301"
     }
   }
+
+  tags = merge(var.tags, { Name = "${var.name}-listener-${each.key}" })
 
   depends_on = [aws_lb_listener.forward]
 }

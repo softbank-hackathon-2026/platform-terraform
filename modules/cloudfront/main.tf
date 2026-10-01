@@ -8,7 +8,7 @@ locals {
 }
 
 resource "aws_cloudfront_origin_access_control" "s3" {
-  name                              = "${var.name}-s3"
+  name                              = "${var.name}-cloudfront-oac-web"
   description                       = "Private frontend S3 access"
   origin_access_control_origin_type = "s3"
   signing_behavior                  = "always"
@@ -17,7 +17,7 @@ resource "aws_cloudfront_origin_access_control" "s3" {
 
 resource "aws_cloudfront_vpc_origin" "api" {
   vpc_origin_endpoint_config {
-    name                   = "${var.name}-api"
+    name                   = "${var.name}-cloudfront-api"
     arn                    = var.alb_arn
     http_port              = 80
     https_port             = 443
@@ -28,21 +28,22 @@ resource "aws_cloudfront_vpc_origin" "api" {
     }
   }
 
-  tags = merge(var.tags, { Name = "${var.name}-api" })
+  tags = merge(var.tags, { Name = "${var.name}-cloudfront-api" })
 }
 
 resource "aws_cloudfront_function" "spa" {
-  name    = "${var.name}-spa"
+  name    = "${var.name}-cloudfront-spa"
   runtime = "cloudfront-js-2.0"
   comment = "Rewrite extensionless frontend routes to index.html"
   publish = true
   code    = file("${path.module}/spa.js")
+  tags    = merge(var.tags, { Name = "${var.name}-cloudfront-spa" })
 }
 
 resource "aws_cloudfront_distribution" "this" {
   enabled             = true
   is_ipv6_enabled     = true
-  comment             = var.name
+  comment             = "${var.name}-cloudfront-web"
   default_root_object = "index.html"
   http_version        = "http2"
   price_class         = "PriceClass_All"
@@ -133,5 +134,5 @@ resource "aws_cloudfront_distribution" "this" {
     cloudfront_default_certificate = true
   }
 
-  tags = merge(var.tags, { Name = var.name })
+  tags = merge(var.tags, { Name = "${var.name}-cloudfront-web" })
 }

@@ -3,8 +3,9 @@ data "aws_region" "current" {
 }
 
 locals {
-  services   = var.service == null ? {} : { this = var.service }
-  log_region = var.log_region == null ? data.aws_region.current[0].region : var.log_region
+  services       = var.service == null ? {} : { this = var.service }
+  log_region     = var.log_region == null ? data.aws_region.current[0].region : var.log_region
+  log_group_name = var.log_group_name == null ? "/ecs/${var.name}" : var.log_group_name
 }
 
 resource "aws_ecs_cluster" "this" {
@@ -13,9 +14,9 @@ resource "aws_ecs_cluster" "this" {
 }
 
 resource "aws_cloudwatch_log_group" "this" {
-  name              = "/ecs/${var.name}"
+  name              = local.log_group_name
   retention_in_days = var.log_retention_days
-  tags              = merge(var.tags, { Name = var.name })
+  tags              = merge(var.tags, { Name = local.log_group_name })
 }
 
 resource "aws_ecs_task_definition" "this" {

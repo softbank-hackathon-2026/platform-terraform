@@ -1,7 +1,7 @@
 resource "aws_iam_role" "this" {
   name               = var.name
   assume_role_policy = var.assume_role_policy_json
-  tags               = var.tags
+  tags               = merge(var.tags, { Name = var.name })
 }
 
 resource "aws_iam_role_policy_attachment" "this" {
@@ -16,7 +16,7 @@ resource "aws_iam_instance_profile" "this" {
 
   name = aws_iam_role.this.name
   role = aws_iam_role.this.name
-  tags = var.tags
+  tags = merge(var.tags, { Name = aws_iam_role.this.name })
 
   depends_on = [aws_iam_role_policy_attachment.this]
 }

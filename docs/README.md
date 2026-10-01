@@ -2,7 +2,7 @@
 
 마지막 확인일: 2026-10-01
 
-이 저장소는 환경별 Terraform 실행기와 재사용 가능한 AWS Terraform 모듈을 제공합니다. `env/dev`에 ECS와 PostgreSQL Multi-AZ Root Module을 구현하고 `sbh-platform`으로 실제 AWS Plan을 확인했습니다. Plan은 56개 생성, 변경과 삭제 0개이며 Apply와 배포는 하지 않았습니다. `env/stg`와 `env/prd`는 아직 Root Module이 없습니다.
+이 저장소는 환경별 Terraform 실행기와 재사용 가능한 AWS Terraform 모듈을 제공합니다. `env/dev`에 ECS와 PostgreSQL Multi-AZ Root Module을 구현했습니다. 네이밍과 태깅 변경 후 `sbh-platform` 실제 AWS Plan은 56개 생성, 변경과 삭제 0개였고 태그 지원 리소스 42개의 계획 태그를 확인했습니다. Apply와 배포는 하지 않았습니다. `env/stg`와 `env/prd`는 아직 Root Module이 없습니다.
 
 ## 새 세션에서 확인할 순서
 
@@ -56,6 +56,7 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 | EKS 및 클러스터 공통 구성 | Unit 1, 2 구현, Test, Review 완료. Unit 3~5 미시작 | 두 Unit 포맷, 구성 검증 통과, 각 mock Plan 16개 통과 | 실제 AWS 기준 미수행 | Unit 1 `15fe220`, Unit 2 `4c6c680` 원격 main 확인 | [EKS AI-DLC](./ai-dlc/eks-module.md) |
 | ECS와 CloudFront 모듈 | 구현과 Review 완료 | ECS mock 6개, CloudFront mock 3개, SPA 14개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
 | 환경별 Root Module | dev ECS/PostgreSQL 구현 완료, stg/prd 미구현 | fmt, validate, 결합 mock 3개와 전체 Plan 점검 2개 통과 | sbh-platform dev 56 add / 0 change / 0 destroy, Apply 미수행 | 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
+| dev 네이밍과 태깅 | `env/dev`와 연결 모듈에 규칙 반영 | validate, 결합 mock 5개, 전체 Plan 점검 2개, ALB 15개, SG 8개, ECS 6개, IAM Role 5개 통과 | 56 add / 0 change / 0 destroy, 42개 리소스 계획 태그 확인. Apply 미수행 | `main` 커밋 및 원격 SHA 확인 | [네이밍과 태깅 AI-DLC](./ai-dlc/dev-naming-tagging.md) |
 | 지속 문서화 | RDS, ECR 진행 상태 반영, 기존 10개 모듈 README의 입력, 출력 속성 표 정리와 향후 유지 규칙 추가 | 입력 97개, 출력 49개 코드 대조 및 문서 공백 점검 완료 | 해당 없음 | ECR, README 표, 규칙 커밋 `3f6dbdd` 원격 main 확인 | 이 문서 |
 
 IAM 구현 커밋 `2190a91`을 푸시한 직후 로컬 `HEAD`, `origin/main`, 원격 main의 SHA가 모두 `2190a91b4e6023492d71023f6c69a959d1a825b3`인 것을 확인했습니다.
@@ -148,10 +149,10 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ECS/PostgreSQL dev 구현과 로컬 검증, 실제 AWS Plan 검토를 완료했습니다. mock Plan 26개, SPA 14개와 결합 Plan 점검 2개가 통과했습니다. dev 결합 mock은 기존 RDS의 ephemeral 선언 때문에 공식 Terraform 1.17.0-beta2로 실행했고 실제 Plan은 안정 버전 1.16.4로 실행했습니다. 상세 날짜와 명령은 [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md)에 있습니다.
 
-구현 커밋 `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`을 `codex/ecs-postgresql-dev`에 푸시하고 원격 SHA 일치를 확인했습니다. 제공한 ADR의 네이밍과 태깅 수정은 아직 시작하지 않았으며 이번 구현 커밋에 포함하지 않았습니다.
+이전 ECS/PostgreSQL 구현 커밋 `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`은 `codex/ecs-postgresql-dev`에 푸시됐습니다. 이후 제공한 네이밍과 태깅 규칙을 `env/dev`와 연결 모듈에 적용해 로컬 검증과 실제 AWS Plan 검토를 마쳤습니다. 이 변경은 `main`에 커밋하고 원격 SHA 일치를 확인했습니다. 상세 범위와 검증은 [네이밍과 태깅 AI-DLC](./ai-dlc/dev-naming-tagging.md)에 기록했습니다.
 
-1. 후속 작업으로 제공한 네이밍과 태깅 규칙을 적용하고 테스트와 실제 AWS Plan을 다시 확인합니다. ADR의 팀 승인 상태는 별도로 유지합니다.
-2. 수정 후 Plan을 검토하고 별도 배포 요청을 받은 후 인프라 Apply를 진행합니다. 이번 작업은 Apply, 업로드, DB 계정 생성, ECS 시작과 장애 전환을 수행하지 않았습니다.
+1. ADR의 팀 승인 상태는 별도로 확인합니다. 실제 Plan에서 56개 생성, 변경과 삭제 0개, 태그 지원 리소스 42개의 `tags_all`을 확인했습니다.
+2. 별도 배포 요청을 받은 후 인프라 Apply를 진행합니다. 이번 작업은 Apply, 업로드, DB 계정 생성, ECS 시작과 장애 전환을 수행하지 않았습니다.
 3. 앱 이미지, DB 사용자/Secret과 프론트 빌드를 준비한 뒤 서비스 활성화 Plan을 검토하고 실제 두 AZ 배치와 API/DB 접속을 검증합니다.
 4. EKS의 미완료 Unit 3~5와 stg/prd Root Module은 기존 후속 작업으로 남깁니다. 일반 RDS RR의 모듈 소유 Secret 회전/복구도 별도 운영 작업입니다.
 5. 계획, 로컬 테스트, AWS Plan, Apply, 배포, 커밋과 푸시를 계속 구분합니다.

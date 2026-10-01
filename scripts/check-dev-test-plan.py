@@ -2,6 +2,7 @@
 """Check child-module resources in the two full dev mock plans."""
 
 import json
+import re
 import sys
 from pathlib import Path
 
@@ -22,6 +23,38 @@ def check_plan(plan, active):
 
     def of_type(kind):
         return [r for r in resources.values() if r["type"] == kind]
+
+    taggable = {
+        "aws_vpc", "aws_internet_gateway", "aws_subnet", "aws_route_table", "aws_nat_gateway",
+        "aws_eip", "aws_lb", "aws_lb_target_group", "aws_lb_listener", "aws_security_group",
+        "aws_vpc_security_group_ingress_rule", "aws_vpc_security_group_egress_rule",
+        "aws_db_subnet_group", "aws_db_instance", "aws_ecs_cluster", "aws_cloudwatch_log_group",
+        "aws_ecs_task_definition", "aws_ecs_service", "aws_iam_role", "aws_iam_policy",
+        "aws_ecr_repository", "aws_secretsmanager_secret", "aws_s3_bucket",
+        "aws_cloudfront_distribution", "aws_cloudfront_vpc_origin", "aws_cloudfront_function",
+    }
+    required_tags = {
+        "Project": "SBH", "Scope": "platform", "Environment": "dev",
+        "ManagedBy": "terraform", "Owner": "정호원",
+    }
+    native_name_fields = {
+        "aws_lb": "name", "aws_lb_target_group": "name", "aws_security_group": "name",
+        "aws_iam_role": "name", "aws_iam_policy": "name", "aws_ecr_repository": "name",
+        "aws_ecs_cluster": "name", "aws_ecs_service": "name", "aws_cloudwatch_log_group": "name",
+        "aws_cloudfront_function": "name", "aws_secretsmanager_secret": "name",
+        "aws_db_instance": "identifier", "aws_db_subnet_group": "name", "aws_s3_bucket": "bucket",
+    }
+    for resource in resources.values():
+        if resource["type"] not in taggable:
+            continue
+        tags = resource["change"]["after"].get("tags")
+        require(isinstance(tags, dict), f"Missing resource tags: {resource['address']}")
+        require(all(tags.get(key) == value for key, value in required_tags.items()), f"Required tags mismatch: {resource['address']}")
+        require(all(value and value.strip() for value in tags.values()), f"Empty tag value: {resource['address']}")
+        require(re.fullmatch(r"sbh-platform-dev-[a-z0-9]+(?:-[a-z0-9]+)*", tags.get("Name", "")), f"Invalid Name tag: {resource['address']}")
+        field = native_name_fields.get(resource["type"])
+        if field:
+            require(tags["Name"] == resource["change"]["after"][field], f"Name tag differs from AWS name: {resource['address']}")
 
     require(len(of_type("aws_subnet")) == 6, "Expected six subnets")
     require(len(of_type("aws_nat_gateway")) == 2, "Expected two NAT gateways")
@@ -50,6 +83,7 @@ def check_plan(plan, active):
         "storage_encrypted": True, "publicly_accessible": False,
         "backup_retention_period": 7, "deletion_protection": True,
         "skip_final_snapshot": False, "manage_master_user_password": True,
+        "copy_tags_to_snapshot": True,
     }.items():
         require(db.get(key) == value, f"RDS {key} mismatch")
     require(db.get("password") is None and db.get("password_wo") is None, "No DB password may be stored")
@@ -66,13 +100,15 @@ def check_plan(plan, active):
     app_secret = attrs("aws_secretsmanager_secret.app_database")["arn"]
     require(statements["ReadApplicationDatabaseSecret"]["Resource"] == app_secret, "Execution role must use app secret only")
     require(statements["PullBackendImage"]["Resource"] == attrs("module.ecr.aws_ecr_repository.this")["arn"], "Image access must be scoped to backend ECR")
-    require(statements["WriteTaskLogs"]["Resource"].endswith("log-group:/ecs/sbh-platform-dev-backend:log-stream:*"), "Logs must be scoped to backend streams")
+    require(statements["WriteTaskLogs"]["Resource"].endswith("log-group:sbh-platform-dev-log-api:log-stream:*"), "Logs must be scoped to backend streams")
     require(not any(a.startswith("module.task_role.aws_iam_role_policy_attachment") for a in resources), "Task role must not inherit execution permissions")
     require(attrs("module.ecs.aws_cloudwatch_log_group.this")["retention_in_days"] == 30, "Logs must be kept for 30 days")
 
     alb = attrs("module.alb.aws_lb.this")
+    require(alb["name"] == "sbh-platform-dev-alb-api" and len(alb["name"]) <= 32, "ALB naming mismatch")
     require(alb["internal"] is True and alb["subnets"] == ["subnet-app-a", "subnet-app-c"], "ALB must be internal in app subnets")
     target = attrs('module.alb.aws_lb_target_group.this["api"]')
+    require(target["name"] == "sbh-platform-dev-tg-api" and len(target["name"]) <= 32, "Target group naming mismatch")
     port = 9090 if active else 8080
     require(target["target_type"] == "ip" and target["port"] == port, "Fargate requires the correct IP target group")
     require(target["health_check"][0]["path"] == ("/api/ready" if active else "/api/health"), "Health path must propagate")
@@ -92,6 +128,8 @@ def check_plan(plan, active):
     bucket_policy = json.loads(attrs("aws_s3_bucket_policy.frontend")["policy"])
     require(bucket_policy["Statement"][0]["Condition"]["StringEquals"]["AWS:SourceArn"] == distribution["arn"], "S3 access must be scoped to this distribution")
     require(attrs("module.frontend.aws_s3_bucket_versioning.this[0]")["versioning_configuration"][0]["status"] == "Enabled", "Frontend versioning must be enabled")
+    bucket = attrs("module.frontend.aws_s3_bucket.this")["bucket"]
+    require(bucket == "sbh-platform-dev-s3-web-123456789012" and len(bucket) <= 63, "S3 bucket naming mismatch")
 
     require(len(of_type("aws_ecs_service")) == int(active), "Service bootstrap mismatch")
     require(len(of_type("aws_ecs_task_definition")) == int(active), "Task bootstrap mismatch")
@@ -117,7 +155,7 @@ def check_plan(plan, active):
 def main(path):
     events = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
     summaries = [e["test_summary"] for e in events if e["type"] == "test_summary"]
-    require(summaries and summaries[-1]["status"] == "pass" and summaries[-1]["passed"] == 3, "Terraform tests must all pass first")
+    require(summaries and summaries[-1]["status"] == "pass" and summaries[-1]["passed"] == 5, "Terraform tests must all pass first")
     plans = {e["@testrun"]: e["test_plan"] for e in events if e["type"] == "test_plan"}
     for name, active in [("infrastructure_only", False), ("activate_two_tasks", True)]:
         require(name in plans, f"Missing mock plan: {name}")

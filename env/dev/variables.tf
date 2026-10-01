@@ -1,18 +1,3 @@
-variable "project_name" {
-  description = "dev 리소스 이름의 프로젝트 접두사입니다."
-  type        = string
-  default     = "sbh-platform"
-
-  validation {
-    condition = (
-      length(var.project_name) <= 20 &&
-      can(regex("^[a-z][a-z0-9]*(-[a-z0-9]+)*$", var.project_name)) &&
-      !startswith(var.project_name, "internal-")
-    )
-    error_message = "project_name은 영문 소문자로 시작하는 1~20자의 소문자, 숫자, 단일 하이픈이며 internal-로 시작할 수 없습니다."
-  }
-}
-
 variable "vpc_cidr" {
   description = "두 AZ의 세 Subnet 계층을 나눌 IPv4 /16 CIDR입니다."
   type        = string
@@ -91,7 +76,18 @@ variable "db_name" {
 }
 
 variable "tags" {
-  description = "dev 리소스에 추가할 태그입니다. Project, Environment와 ManagedBy는 Root Module 값이 우선합니다."
+  description = "dev 리소스에 추가할 태그입니다. 필수 태그와 Name은 Root Module과 각 리소스에서 설정합니다."
   type        = map(string)
   default     = {}
+
+  validation {
+    condition = alltrue([
+      for key, value in var.tags :
+      length(trimspace(key)) > 0 &&
+      length(trimspace(value)) > 0 &&
+      !contains(["name", "project", "scope", "environment", "managedby", "owner", "applicationid", "deploymentid"], lower(key)) &&
+      (lower(key) != "infraid" || key == "InfraId")
+    ])
+    error_message = "추가 태그는 빈 값, 필수 태그와 Name의 재정의 또는 공통 ApplicationId와 DeploymentId를 허용하지 않습니다. InfraId는 정확한 대소문자를 사용하세요."
+  }
 }

@@ -17,28 +17,28 @@ mock_provider "aws" {
   }
   mock_resource "aws_s3_bucket" {
     defaults = {
-      id                          = "sbh-platform-dev-frontend-123456789012"
-      arn                         = "arn:aws:s3:::sbh-platform-dev-frontend-123456789012"
-      bucket_regional_domain_name = "sbh-platform-dev-frontend-123456789012.s3.ap-northeast-2.amazonaws.com"
+      id                          = "sbh-platform-dev-s3-web-123456789012"
+      arn                         = "arn:aws:s3:::sbh-platform-dev-s3-web-123456789012"
+      bucket_regional_domain_name = "sbh-platform-dev-s3-web-123456789012.s3.ap-northeast-2.amazonaws.com"
     }
   }
   mock_resource "aws_ecr_repository" {
     defaults = {
-      arn            = "arn:aws:ecr:ap-northeast-2:123456789012:repository/sbh-platform-dev/backend"
-      repository_url = "123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/sbh-platform-dev/backend"
+      arn            = "arn:aws:ecr:ap-northeast-2:123456789012:repository/sbh-platform-dev-ecr-api"
+      repository_url = "123456789012.dkr.ecr.ap-northeast-2.amazonaws.com/sbh-platform-dev-ecr-api"
     }
   }
   mock_resource "aws_iam_policy" {
-    defaults = { arn = "arn:aws:iam::123456789012:policy/sbh-platform-dev-ecs-execution" }
+    defaults = { arn = "arn:aws:iam::123456789012:policy/sbh-platform-dev-policy-ecs-execution" }
   }
   mock_resource "aws_ecs_cluster" {
-    defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:cluster/sbh-platform-dev-backend" }
+    defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:cluster/sbh-platform-dev-ecs-api" }
   }
   mock_resource "aws_ecs_task_definition" {
-    defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:task-definition/sbh-platform-dev-backend:1" }
+    defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:task-definition/sbh-platform-dev-ecs-api:1" }
   }
   mock_resource "aws_cloudfront_function" {
-    defaults = { arn = "arn:aws:cloudfront::123456789012:function/sbh-platform-dev-spa" }
+    defaults = { arn = "arn:aws:cloudfront::123456789012:function/sbh-platform-dev-cloudfront-spa" }
   }
   mock_resource "aws_cloudfront_distribution" {
     defaults = {
@@ -57,7 +57,7 @@ mock_provider "aws" {
     }
   }
   mock_resource "aws_secretsmanager_secret" {
-    defaults = { arn = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:sbh-platform-dev/database/app-AbCdEf" }
+    defaults = { arn = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:sbh-platform-dev-secret-db-app-AbCdEf" }
   }
 }
 
@@ -123,25 +123,25 @@ override_resource {
 override_resource {
   target          = module.execution_role.aws_iam_role.this
   override_during = plan
-  values          = { arn = "arn:aws:iam::123456789012:role/sbh-platform-dev-ecs-execution" }
+  values          = { arn = "arn:aws:iam::123456789012:role/sbh-platform-dev-role-ecs-execution" }
 }
 override_resource {
   target          = module.task_role.aws_iam_role.this
   override_during = plan
-  values          = { arn = "arn:aws:iam::123456789012:role/sbh-platform-dev-ecs-task" }
+  values          = { arn = "arn:aws:iam::123456789012:role/sbh-platform-dev-role-ecs-task" }
 }
 override_resource {
   target          = module.alb.aws_lb.this
   override_during = plan
   values = {
-    arn      = "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/sbh-platform-dev-alb/1234567890123456"
+    arn      = "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:loadbalancer/app/sbh-platform-dev-alb-api/1234567890123456"
     dns_name = "internal-platform.ap-northeast-2.elb.amazonaws.com"
   }
 }
 override_resource {
   target          = module.alb.aws_lb_target_group.this["api"]
   override_during = plan
-  values          = { arn = "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup/sbh-platform-dev-api/1234567890123456" }
+  values          = { arn = "arn:aws:elasticloadbalancing:ap-northeast-2:123456789012:targetgroup/sbh-platform-dev-tg-api/1234567890123456" }
 }
 
 run "infrastructure_only" {
@@ -185,7 +185,7 @@ run "activate_two_tasks" {
   }
   assert {
     condition = (
-      output.backend.service_name == "sbh-platform-dev-backend" &&
+      output.backend.service_name == "sbh-platform-dev-ecs-api" &&
       output.backend.task_definition_arn != null &&
       aws_vpc_security_group_ingress_rule.alb_to_ecs.from_port == 9090 &&
       aws_vpc_security_group_egress_rule.alb_to_ecs.to_port == 9090
@@ -198,4 +198,16 @@ run "reject_tag_instead_of_digest" {
   command = plan
   variables { backend_image_digest = "latest" }
   expect_failures = [var.backend_image_digest]
+}
+
+run "reject_empty_tag_value" {
+  command = plan
+  variables { tags = { Team = "" } }
+  expect_failures = [var.tags]
+}
+
+run "reject_global_application_id" {
+  command = plan
+  variables { tags = { ApplicationId = "app-1" } }
+  expect_failures = [var.tags]
 }

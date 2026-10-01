@@ -11,6 +11,7 @@ Security Group, VPC Endpoint, VPC Peering, Transit Gateway, VPN, Network Firewal
 - Private Subnet마다 Route Table을 하나씩 생성합니다.
 - NAT Gateway는 기본적으로 생성하지 않습니다.
 - 입력 태그보다 모듈의 `Name` 태그를 우선합니다.
+- `name` 접두사 뒤에 리소스 유형과 용도를 붙입니다. 예를 들어 `sbh-platform-dev`는 `sbh-platform-dev-vpc-shared`, `sbh-platform-dev-subnet-app-a`, `sbh-platform-dev-rt-app-a`의 `Name` 태그를 만듭니다.
 
 ## 입력 속성
 

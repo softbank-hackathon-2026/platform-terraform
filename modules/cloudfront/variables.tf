@@ -1,10 +1,10 @@
 variable "name" {
-  description = "CloudFront OAC, VPC Origin과 Function 이름의 접두사입니다."
+  description = "CloudFront 리소스 이름의 접두사입니다."
   type        = string
 
   validation {
-    condition     = can(regex("^[A-Za-z0-9_-]{1,48}$", var.name))
-    error_message = "name은 1~48자의 영문자, 숫자, 밑줄, 하이픈이어야 합니다."
+    condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.name)) && length(var.name) <= 45
+    error_message = "name은 1~45자의 소문자, 숫자, 단일 하이픈이어야 합니다."
   }
 }
 
@@ -39,7 +39,7 @@ variable "alb_dns_name" {
 }
 
 variable "tags" {
-  description = "CloudFront Distribution과 VPC Origin에 적용할 추가 태그입니다."
+  description = "CloudFront Distribution, VPC Origin과 Function에 적용할 추가 태그입니다."
   type        = map(string)
   default     = {}
 }

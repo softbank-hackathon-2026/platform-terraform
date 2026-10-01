@@ -17,6 +17,7 @@ resource "aws_vpc_security_group_ingress_rule" "this" {
   to_port                      = each.value.to_port
   cidr_ipv4                    = each.value.cidr_ipv4
   referenced_security_group_id = each.value.referenced_security_group_id
+  tags                         = merge(var.tags, { Name = "${var.name}-sgr-in-${each.key}" })
 }
 
 resource "aws_vpc_security_group_egress_rule" "this" {
@@ -29,4 +30,5 @@ resource "aws_vpc_security_group_egress_rule" "this" {
   to_port                      = each.value.to_port
   cidr_ipv4                    = each.value.cidr_ipv4
   referenced_security_group_id = each.value.referenced_security_group_id
+  tags                         = merge(var.tags, { Name = "${var.name}-sgr-out-${each.key}" })
 }

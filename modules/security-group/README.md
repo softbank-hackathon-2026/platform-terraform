@@ -10,7 +10,7 @@ VPC 안에 Security Group 하나를 만들고, 명시한 인바운드 및 아웃
 | `vpc_id` | `string` | 필수 | Security Group을 생성할 VPC ID입니다. |
 | `ingress_rules` | `map(object)` | `{}` | 논리 키별 인바운드 규칙입니다. 기본값은 규칙 없음입니다. |
 | `egress_rules` | `map(object)` | `{}` | 논리 키별 아웃바운드 규칙입니다. 기본값은 규칙 없음입니다. |
-| `tags` | `map(string)` | `{}` | Security Group에 붙일 추가 태그입니다. Name은 `name`이 우선합니다. |
+| `tags` | `map(string)` | `{}` | Security Group과 개별 규칙에 붙일 태그입니다. `Name`은 그룹 이름과 규칙 키에서 만듭니다. |
 
 `ingress_rules`와 `egress_rules`의 각 규칙은 같은 구조를 사용합니다.
 

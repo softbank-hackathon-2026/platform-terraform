@@ -33,7 +33,7 @@ CloudFront가 생성하는 `CloudFront-VPCOrigins-Service-SG`는 AWS 관리 대�
 
 ## 모니터링
 
-- ECS: Running/Desired Task 수, 서비스 이벤트, CPU와 메모리, 배포 Circuit Breaker, `/ecs/sbh-platform-dev-backend` 로그를 확인해요. 로그는 30일 보존해요.
+- ECS: Running/Desired Task 수, 서비스 이벤트, CPU와 메모리, 배포 Circuit Breaker, `sbh-platform-dev-log-api` 로그를 확인해요. 로그는 30일 보존해요.
 - ALB: Healthy/UnHealthy Host 수, Target 5xx, ALB 5xx와 응답 지연을 확인해요.
 - CloudFront: 4xx/5xx와 API 지연을 확인해요. 오류는 SPA HTML로 바꾸지 않아요.
 - RDS: DB 상태, 장애 전환 이벤트, CPU, FreeableMemory, FreeStorageSpace와 DatabaseConnections를 확인해요. 백업은 7일 보존해요.

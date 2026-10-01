@@ -28,7 +28,6 @@ DB는 PostgreSQL 17.11, db.t4g.small, gp3 20 GiB예요. 자동 장애 전환용 
 
 | 속성 | 타입 | 기본값 | 역할 |
 |---|---|---|---|
-| `project_name` | `string` | `"sbh-platform"` | 리소스 이름 접두사예요. `-dev`가 붙어요. |
 | `vpc_cidr` | `string` | `"10.20.0.0/16"` | 네트워크 주소로 정렬된 IPv4 /16 CIDR이에요. |
 | `container_port` | `number` | `8080` | ECS, ALB Target Group과 Security Group의 앱 포트예요. |
 | `health_check_path` | `string` | `"/api/health"` | ALB가 HTTP 200을 확인할 경로예요. |
@@ -36,7 +35,15 @@ DB는 PostgreSQL 17.11, db.t4g.small, gp3 20 GiB예요. 자동 장애 전환용 
 | `postgres_engine_version` | `string` | `"17.11"` | PostgreSQL 버전이에요. 변경 시 리전 지원을 다시 확인하세요. |
 | `postgres_instance_class` | `string` | `"db.t4g.small"` | DB 인스턴스 클래스예요. |
 | `db_name` | `string` | `"sbhapp"` | 초기 데이터베이스 이름이에요. |
-| `tags` | `map(string)` | `{}` | 추가 태그예요. Project, Environment, ManagedBy는 Root 값이 우선해요. |
+| `tags` | `map(string)` | `{}` | 추가 공통 태그예요. 빈 값, 필수 태그와 `Name`의 재정의, 공통 `ApplicationId`와 `DeploymentId`는 거부해요. `InfraId`는 정확한 대소문자를 사용해요. |
+
+## 네이밍과 태깅
+
+직접 관리하는 리소스는 `sbh-platform-dev-<type>-<purpose>` 형식으로 이름을 지정해요. VPC는 `sbh-platform-dev-vpc-shared`, ALB는 `sbh-platform-dev-alb-api`, Target Group은 `sbh-platform-dev-tg-api`, 프론트 S3 버킷은 `sbh-platform-dev-s3-web-<account-id>`예요. S3 버킷은 계정 ID로 전역 중복 가능성을 줄여요.
+
+AWS Provider의 `default_tags`와 각 모듈의 `tags`에 `Project=SBH`, `Scope=platform`, `Environment=dev`, `ManagedBy=terraform`, `Owner=정호원`을 적용해요. 태그를 지원하는 각 리소스의 `Name`은 리소스 이름이나 역할에 맞춰 별도로 설정해요. 공유 리소스에 특정 앱이나 배포의 `ApplicationId`, `DeploymentId`는 넣지 않아요. `InfraId`는 시스템의 실제 식별자가 정해지면 추가할 수 있어요.
+
+CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가 허용하는 이름으로 식별해요. RDS 관리형 관리자 Secret과 CloudFront VPC Origin의 하위 리소스 등 AWS가 생성하는 리소스의 태그는 Apply 이후 별도로 확인해야 해요. Terraform Plan은 이 확인을 대신하지 않아요.
 
 ## 출력 속성
 
@@ -105,6 +112,6 @@ python3 scripts/check-dev-test-plan.py .local/dev-tests.jsonl
 node --test modules/cloudfront/tests/spa.test.cjs
 ```
 
-AWS와 Random Provider를 mock으로 대체해 자격 증명 없이 테스트해요. 기존 RDS 모듈에는 두 Provider의 ephemeral 선언이 있어 1.16.4에서 결합 mock 테스트가 실행되지 않아요. 기존 RDS 테스트와 같은 방식으로 `tests-terraform-1.17`에 테스트를 분리하고, [공식 1.17.0-beta2 테스트 CLI](https://releases.hashicorp.com/terraform/1.17.0-beta2/)를 Git 제외 폴더에 내려받아 SHA-256을 확인한 뒤 사용했어요. 모듈과 실제 Plan은 1.11 이상에서 사용해요. 이번 실제 Plan은 안정 버전 1.16.4로 실행해요. mock 테스트는 AWS 리소스나 Backend State를 만들지 않아요.
+AWS와 Random Provider를 mock으로 대체해 자격 증명 없이 테스트해요. 기존 RDS 모듈에는 두 Provider의 ephemeral 선언이 있어 1.16.4에서 결합 mock 테스트가 실행되지 않아요. 기존 RDS 테스트와 같은 방식으로 `tests-terraform-1.17`에 테스트를 분리하고, [공식 1.17.0-beta2 테스트 CLI](https://releases.hashicorp.com/terraform/1.17.0-beta2/)를 Git 제외 폴더에 내려받아 SHA-256을 확인한 뒤 사용했어요. 모듈과 실제 Plan은 1.11 이상에서 사용해요. 네이밍과 태깅 변경 후 실제 Plan은 안정 버전 1.15.4로 실행했고 56개 생성, 변경과 삭제 0개를 확인했어요. mock 테스트는 AWS 리소스나 Backend State를 만들지 않아요.
 
 초기 구성과 Task 활성화 구성의 전체 Plan을 검사해요. Subnet 6개, NAT 2개, DB 경로 격리, RDS Multi-AZ, Role/Secret 분리와 서비스 Task 2개를 확인해요. 배포와 운영 절차는 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)에 있어요.

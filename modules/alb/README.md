@@ -14,7 +14,7 @@ Application Load Balancer 하나와 0개 이상의 Target Group, Listener를 생
 | `target_groups` | `map(object)` | `{}` | 논리 키별 Target Group 정의입니다. |
 | `listeners` | `map(object)` | `{}` | 논리 키별 Listener 정의입니다. |
 | `enable_deletion_protection` | `bool` | `false` | ALB 삭제 보호를 켭니다. |
-| `tags` | `map(string)` | `{}` | ALB와 Target Group에 붙일 태그입니다. Name은 모듈 이름이 우선합니다. |
+| `tags` | `map(string)` | `{}` | ALB, Target Group과 Listener에 붙일 태그입니다. `Name`은 각 리소스 이름이 우선합니다. |
 
 `target_groups`의 각 값은 다음 속성을 사용합니다.
 

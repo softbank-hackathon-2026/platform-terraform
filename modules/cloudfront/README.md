@@ -6,11 +6,11 @@
 
 | 속성 | 타입 | 기본값 | 역할 |
 |---|---|---|---|
-| `name` | `string` | 필수 | OAC, VPC Origin과 Function 이름 접두사예요. |
+| `name` | `string` | 필수 | CloudFront 리소스 이름 접두사예요. 소문자, 숫자, 단일 하이픈을 사용하며 최대 45자예요. |
 | `s3_origin_domain_name` | `string` | 필수 | S3 버킷의 리전별 REST 도메인이에요. |
 | `alb_arn` | `string` | 필수 | Internal ALB ARN이에요. |
 | `alb_dns_name` | `string` | 필수 | Internal ALB DNS 이름이에요. |
-| `tags` | `map(string)` | `{}` | Distribution과 VPC Origin에 붙일 태그예요. |
+| `tags` | `map(string)` | `{}` | Distribution, VPC Origin과 Function에 붙일 태그예요. 각각의 `Name`은 모듈이 설정해요. OAC에는 태그 입력이 없어요. |
 
 ## 출력 속성
 

@@ -9,10 +9,11 @@ ECS Cluster와 CloudWatch Logs 그룹을 만들고, 선택적으로 On-Demand Fa
 | 속성 | 타입 | 기본값 | 역할 |
 |---|---|---|---|
 | `name` | `string` | 필수 | Cluster, Service, Task Family 이름과 로그 그룹 접두사예요. |
+| `log_group_name` | `string` | `null` → `/ecs/<name>` | Task 로그 그룹 이름이에요. dev Root Module은 네이밍 규칙에 맞는 이름을 지정해요. |
 | `log_region` | `string` | `null` | 로그 그룹과 호출 AWS Provider의 Region이에요. 생략하면 조회하고, 명시하면 로그 구성이 Plan 단계에 확정돼요. 같은 Region을 지정하세요. |
 | `log_retention_days` | `number` | `30` | Task 로그 보존 기간이에요. |
 | `service` | `object` | `null` | Task Definition과 Service를 활성화하는 설정이에요. |
-| `tags` | `map(string)` | `{}` | 리소스에 붙일 추가 태그예요. |
+| `tags` | `map(string)` | `{}` | ECS 리소스와 로그 그룹에 붙일 태그예요. `Name`은 모듈이 각 이름으로 설정해요. |
 
 `service`의 내부 속성이에요. CPU 단위는 1024 = 1 vCPU, 메모리 단위는 MiB예요.
 

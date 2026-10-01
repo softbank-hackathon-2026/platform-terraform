@@ -74,6 +74,7 @@ resource "aws_db_instance" "primary" {
   password_wo_version                 = local.master_password_version
   iam_database_authentication_enabled = var.iam_database_authentication_enabled
   backup_retention_period             = var.backup_retention_period
+  copy_tags_to_snapshot               = true
   deletion_protection                 = var.deletion_protection
   skip_final_snapshot                 = var.skip_final_snapshot
   final_snapshot_identifier           = var.skip_final_snapshot ? null : coalesce(var.final_snapshot_identifier, "${var.identifier}-final")

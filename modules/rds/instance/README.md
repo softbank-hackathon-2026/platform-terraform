@@ -146,7 +146,7 @@ IAM 주체에 이 정책을 연결한 뒤, 해당 DB 주소와 포트 및 DB 사
 
 ## 데이터 보호와 삭제
 
-스토리지 암호화, 자동 백업 7일, 삭제 보호, 최종 스냅샷 생성이 기본입니다. `kms_key_id`, `backup_retention_period`, `deletion_protection`, `skip_final_snapshot`으로 조정할 수 있습니다. 최종 스냅샷 기본 이름은 `<identifier>-final`입니다. 같은 이름의 스냅샷이 이미 있으면 삭제가 실패할 수 있으므로 삭제 전에 `final_snapshot_identifier`를 새 이름으로 바꾸세요.
+스토리지 암호화, 자동 백업 7일, 삭제 보호, 최종 스냅샷 생성이 기본입니다. DB 태그를 스냅샷에 복사하도록 설정합니다. `kms_key_id`, `backup_retention_period`, `deletion_protection`, `skip_final_snapshot`으로 조정할 수 있습니다. 최종 스냅샷 기본 이름은 `<identifier>-final`입니다. 같은 이름의 스냅샷이 이미 있으면 삭제가 실패할 수 있으므로 삭제 전에 `final_snapshot_identifier`를 새 이름으로 바꾸세요.
 
 백업 보존 기간과 최종 스냅샷 정책은 고정이 아닙니다. 예를 들어 `backup_retention_period = 14`로 자동 백업을 14일 보존할 수 있습니다. 다만 현재 모듈은 자동 백업을 끄는 `0`일을 허용하지 않고, 백업 실행 시간(`backup_window`)이나 복제본별 백업 설정은 입력으로 받지 않습니다.
 

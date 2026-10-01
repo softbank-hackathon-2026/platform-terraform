@@ -19,7 +19,7 @@
 | `kms_key_arn` | `string` | `null` | 기존 고객 관리 KMS 키 ARN입니다. 생략하면 AES256 암호화를 사용합니다. |
 | `scan_on_push` | `bool` | `true` | 저장소 수준의 push 시 기본 이미지 스캔 설정입니다. 실제 동작은 Registry 설정도 확인해야 합니다. |
 | `lifecycle_policy_json` | `string` | `null` | 선택적 Lifecycle Policy JSON입니다. 생략하면 정책을 만들지 않습니다. |
-| `tags` | `map(string)` | `{}` | 저장소에 붙일 태그입니다. |
+| `tags` | `map(string)` | `{}` | 저장소에 붙일 태그입니다. `Name`은 저장소 이름이 우선합니다. |
 
 ## 기본 사용 예시
 

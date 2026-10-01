@@ -10,7 +10,7 @@
 | `assume_role_policy_json` | `string` | 필수 | Role을 사용할 주체를 정하는 신뢰 정책 JSON입니다. |
 | `managed_policy_arns` | `map(string)` | `{}` | 논리 키별 관리형 권한 Policy ARN입니다. |
 | `create_instance_profile` | `bool` | `false` | EC2에 연결할 Instance Profile 생성 여부입니다. |
-| `tags` | `map(string)` | `{}` | Role과 선택적 Instance Profile에 붙일 태그입니다. |
+| `tags` | `map(string)` | `{}` | Role과 선택적 Instance Profile에 붙일 태그입니다. `Name`은 Role 이름이 우선합니다. |
 
 ## 출력 속성
 

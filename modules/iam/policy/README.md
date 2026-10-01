@@ -9,7 +9,7 @@
 | `name` | `string` | 필수 | 생성할 고객 관리 IAM Policy 이름입니다. |
 | `policy_json` | `string` | 필수 | 호출자가 작성한 IAM 권한 정책 JSON입니다. JSON 문법을 검사합니다. |
 | `description` | `string` | `null` | Policy 설명입니다. |
-| `tags` | `map(string)` | `{}` | Policy에 붙일 태그입니다. |
+| `tags` | `map(string)` | `{}` | Policy에 붙일 태그입니다. `Name`은 Policy 이름이 우선합니다. |
 
 ## 출력 속성
 

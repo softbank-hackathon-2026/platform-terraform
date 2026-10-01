@@ -2,11 +2,13 @@ data "aws_caller_identity" "current" {}
 data "aws_partition" "current" {}
 
 locals {
-  name = "${var.project_name}-dev"
+  name = "sbh-platform-dev"
   tags = merge(var.tags, {
-    Project     = var.project_name
+    Project     = "SBH"
+    Scope       = "platform"
     Environment = "dev"
-    ManagedBy   = "Terraform"
+    ManagedBy   = "terraform"
+    Owner       = "정호원"
   })
   app_subnet_ids = [module.network.private_subnet_ids["app_a"], module.network.private_subnet_ids["app_c"]]
   db_subnet_ids  = [module.network.private_subnet_ids["db_a"], module.network.private_subnet_ids["db_c"]]
@@ -38,28 +40,28 @@ module "network" {
 module "frontend" {
   source = "../../modules/s3"
 
-  bucket_name        = "${local.name}-frontend-${data.aws_caller_identity.current.account_id}"
+  bucket_name        = "${local.name}-s3-web-${data.aws_caller_identity.current.account_id}"
   versioning_enabled = true
   tags               = local.tags
 }
 
 module "ecr" {
   source = "../../modules/ecr"
-  name   = "${local.name}/backend"
+  name   = "${local.name}-ecr-api"
   tags   = local.tags
 }
 
 module "alb" {
   source = "../../modules/alb"
 
-  name               = "${local.name}-alb"
+  name               = "${local.name}-alb-api"
   internal           = true
   vpc_id             = module.network.vpc_id
   subnet_ids         = local.app_subnet_ids
   security_group_ids = [module.alb_security_group.security_group_id]
   target_groups = {
     api = {
-      name              = "${local.name}-api"
+      name              = "${local.name}-tg-api"
       target_type       = "ip"
       protocol          = "HTTP"
       port              = var.container_port
@@ -106,7 +108,7 @@ resource "aws_s3_bucket_policy" "frontend" {
 module "database" {
   source = "../../modules/rds/instance"
 
-  identifier              = "${local.name}-postgres"
+  identifier              = "${local.name}-rds-postgres"
   engine                  = "postgres"
   engine_version          = var.postgres_engine_version
   instance_class          = var.postgres_instance_class
@@ -127,16 +129,17 @@ module "database" {
 }
 
 resource "aws_secretsmanager_secret" "app_database" {
-  name                    = "${local.name}/database/app"
+  name                    = "${local.name}-secret-db-app"
   description             = "Application PostgreSQL credentials: username and password JSON keys, provisioned outside Terraform"
   recovery_window_in_days = 30
-  tags                    = local.tags
+  tags                    = merge(local.tags, { Name = "${local.name}-secret-db-app" })
 }
 
 module "ecs" {
   source = "../../modules/ecs"
 
-  name               = "${local.name}-backend"
+  name               = "${local.name}-ecs-api"
+  log_group_name     = "${local.name}-log-api"
   log_region         = "ap-northeast-2"
   log_retention_days = 30
   service = var.backend_image_digest == null ? null : {

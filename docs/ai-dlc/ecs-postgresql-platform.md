@@ -117,7 +117,7 @@ Backend 버킷은 사용자가 지정한 `sbh-platform-prod-s3-tf`, Key는 추�
 
 2026-10-01 사용자의 현재 변경 커밋과 푸시 요청에 따라 `codex/ecs-postgresql-dev` 브랜치를 생성했습니다. 구현, 테스트와 검증 기록 47개 파일을 커밋 `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`으로 푸시하고 원격 SHA 일치를 확인했습니다. State, Plan, 로그와 로컬 Backend 설정은 Git에서 제외했습니다.
 
-제공한 ADR의 네이밍과 태깅 수정 요청은 후속 작업입니다. 이번 구현 커밋에는 아직 반영하지 않았습니다. 수정 후 로컬 검증과 실제 AWS Plan을 다시 확인하며 `sbh-platform`과 Apply 금지 조건을 유지합니다. ADR의 팀 승인 상태는 변경하지 않았습니다.
+제공한 ADR의 네이밍과 태깅 수정 요청은 이 구현 커밋에 포함하지 않았습니다. 이후 `env/dev`와 연결 모듈에 적용한 내용과 로컬 검증, 변경 후 실제 AWS Plan 결과는 [dev 네이밍과 태깅 AI-DLC](./dev-naming-tagging.md)에 기록합니다. `sbh-platform`과 Apply 금지 조건, ADR의 팀 승인 상태는 그대로 유지합니다.
 
 ## 검증 기록
 

@@ -12,7 +12,7 @@ resource "aws_ecr_repository" "this" {
     scan_on_push = var.scan_on_push
   }
 
-  tags = var.tags
+  tags = merge(var.tags, { Name = var.name })
 }
 
 resource "aws_ecr_lifecycle_policy" "this" {

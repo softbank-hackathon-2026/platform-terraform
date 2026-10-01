@@ -8,6 +8,17 @@ variable "name" {
   }
 }
 
+variable "log_group_name" {
+  description = "Task 로그 그룹 이름입니다. 생략하면 /ecs/<name>을 사용합니다."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.log_group_name == null ? true : length(trimspace(var.log_group_name)) > 0
+    error_message = "log_group_name을 지정하면 비어 있을 수 없습니다."
+  }
+}
+
 variable "log_region" {
   description = "로그 그룹과 호출 AWS Provider의 Region입니다. 생략하면 Provider Region을 조회합니다. 명시하면 의존 리소스 생성 전에도 로그 설정을 Plan에서 확인할 수 있습니다."
   type        = string
