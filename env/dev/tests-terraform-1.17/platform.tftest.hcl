@@ -66,16 +66,6 @@ mock_provider "random" {
 }
 
 override_resource {
-  target          = module.network.aws_subnet.public["public_a"]
-  override_during = plan
-  values          = { id = "subnet-public-a" }
-}
-override_resource {
-  target          = module.network.aws_subnet.public["public_c"]
-  override_during = plan
-  values          = { id = "subnet-public-c" }
-}
-override_resource {
   target          = module.network.aws_subnet.private["app_a"]
   override_during = plan
   values          = { id = "subnet-app-a" }
@@ -96,14 +86,9 @@ override_resource {
   values          = { id = "subnet-db-c" }
 }
 override_resource {
-  target          = module.network.aws_nat_gateway.zonal["ap-northeast-2a"]
+  target          = module.network.aws_nat_gateway.regional[0]
   override_during = plan
-  values          = { id = "nat-app-a" }
-}
-override_resource {
-  target          = module.network.aws_nat_gateway.zonal["ap-northeast-2c"]
-  override_during = plan
-  values          = { id = "nat-app-c" }
+  values          = { id = "nat-regional" }
 }
 override_resource {
   target          = module.alb_security_group.aws_security_group.this
@@ -149,14 +134,17 @@ run "infrastructure_only" {
 
   assert {
     condition = (
-      length(output.network.public_subnet_ids) == 2 &&
+      length(output.network.public_subnet_ids) == 0 &&
       output.network.app_subnet_ids == ["subnet-app-a", "subnet-app-c"] &&
       output.network.db_subnet_ids == ["subnet-db-a", "subnet-db-c"] &&
-      length(output.network.nat_gateway_ids) == 2 &&
+      output.network.nat_gateway_ids == {
+        "ap-northeast-2a" = "nat-regional"
+        "ap-northeast-2c" = "nat-regional"
+      } &&
       output.backend.service_name == null && output.backend.task_definition_arn == null &&
       aws_secretsmanager_secret.app_database.arn != output.database.master_secret_arn
     )
-    error_message = "3계층 Subnet, NAT 2개, 초기 서비스 생략과 관리자/앱 Secret 분리가 필요합니다."
+    error_message = "Public Subnet 없는 App/DB 계층, Regional NAT 하나, 초기 서비스 생략과 관리자/앱 Secret 분리가 필요합니다."
   }
 
   assert {

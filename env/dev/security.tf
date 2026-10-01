@@ -75,7 +75,7 @@ resource "aws_vpc_security_group_ingress_rule" "ecs_to_db" {
 
 resource "aws_vpc_security_group_egress_rule" "ecs_https" {
   security_group_id = module.ecs_security_group.security_group_id
-  description       = "External HTTPS APIs and AWS APIs through same-AZ NAT"
+  description       = "External HTTPS APIs and AWS APIs through Regional NAT"
   ip_protocol       = "tcp"
   from_port         = 443
   to_port           = 443

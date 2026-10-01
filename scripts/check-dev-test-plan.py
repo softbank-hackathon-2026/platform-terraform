@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check child-module resources in the two full dev mock plans."""
+"""Check child-module resources in the full dev mock plans."""
 
 import json
 import re
@@ -56,24 +56,25 @@ def check_plan(plan, active, port):
         if field:
             require(tags["Name"] == resource["change"]["after"][field], f"Name tag differs from AWS name: {resource['address']}")
 
-    require(len(of_type("aws_subnet")) == 6, "Expected six subnets")
-    require(len(of_type("aws_nat_gateway")) == 2, "Expected two NAT gateways")
-    require(len(of_type("aws_eip")) == 2, "Expected two NAT EIPs")
-    require(len(of_type("aws_route_table")) == 5, "Expected four private and one public route tables")
-    for tier, base in [("public", 0), ("app", 10), ("db", 20)]:
+    require(len(of_type("aws_subnet")) == 4, "Expected four private subnets and no public subnets")
+    require(len(of_type("aws_nat_gateway")) == 1, "Expected one Regional NAT gateway")
+    require(len(of_type("aws_eip")) == 0, "Regional NAT must not have Terraform-managed EIPs")
+    require(len(of_type("aws_internet_gateway")) == 1, "Regional NAT and CloudFront VPC origin need an internet gateway")
+    require(len(of_type("aws_route_table")) == 4, "Expected four private route tables and no public route table")
+    require(len(of_type("aws_route_table_association")) == 4, "Expected four private route table associations")
+    for tier, base in [("app", 10), ("db", 20)]:
         for offset, az in enumerate(["a", "c"]):
-            group = "public" if tier == "public" else "private"
-            subnet = attrs(f'module.network.aws_subnet.{group}["{tier}_{az}"]')
+            subnet = attrs(f'module.network.aws_subnet.private["{tier}_{az}"]')
             require(subnet["cidr_block"] == f"10.20.{base + offset}.0/24", "Subnet CIDR mismatch")
             require(subnet["availability_zone"] == f"ap-northeast-2{az}", "Subnet AZ mismatch")
             require(subnet["map_public_ip_on_launch"] is False, "Public IP must be disabled")
-    private_routes = [r for r in of_type("aws_route") if "private_" in r["address"]]
-    require(len(private_routes) == 2, "DB subnets must have no default routes")
+    require(len(of_type("aws_route")) == 2, "Only app subnets may have default routes")
+    nat = attrs("module.network.aws_nat_gateway.regional[0]")
+    require(nat["availability_mode"] == "regional" and nat["connectivity_type"] == "public", "Expected public Regional NAT")
+    require(nat["subnet_id"] is None and nat["allocation_id"] is None, "Regional NAT must not use a public subnet or EIP input")
     for az in ["a", "c"]:
-        route = attrs(f'module.network.aws_route.private_zonal["app_{az}"]')
-        nat = attrs(f'module.network.aws_nat_gateway.zonal["ap-northeast-2{az}"]')
-        require(route["nat_gateway_id"] == f"nat-app-{az}", "App NAT must be in the same AZ")
-        require(nat["subnet_id"] == f"subnet-public-{az}", "NAT must be in the same AZ public subnet")
+        route = attrs(f'module.network.aws_route.private_regional["app_{az}"]')
+        require(route["nat_gateway_id"] == "nat-regional", "Both app routes must use the Regional NAT")
 
     db = attrs("module.database.aws_db_instance.primary")
     require(len(of_type("aws_db_instance")) == 1, "Standby must not be modeled as a read replica")

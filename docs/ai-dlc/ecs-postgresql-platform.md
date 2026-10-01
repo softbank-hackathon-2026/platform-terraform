@@ -8,13 +8,13 @@
 |---|---|
 | Ideation | 2026-10-01 전체 구현 계획 승인 |
 | Inception | 같은 계획의 요구사항과 인터페이스 승인 |
-| Construction | Unit 1~4 구현, Test와 Review 완료. 후속 Unit 5에서 dev 백엔드 기본 포트 8000 반영 |
-| 로컬 검증 | 기존 mock Plan 26개와 SPA 14개 통과. 후속 Unit 5의 dev mock 6개, 전체 Plan 점검 3개 통과 |
-| 실제 AWS Plan | 후속 포트 변경 후 `sbh-platform`, 서울, S3 Backend에서 56 add / 0 change / 0 destroy. Target Group과 ALB/ECS 규칙 8000 확인 |
+| Construction | Unit 1~4 구현, Test와 Review 완료. 후속 Unit 5에서 dev 백엔드 기본 포트 8000, Unit 6에서 Regional NAT 반영 |
+| 로컬 검증 | 기존 mock Plan 26개와 SPA 14개 통과. 최신 dev mock 6개, 전체 Plan 점검 3개 통과 |
+| 실제 AWS Plan | Regional NAT 변경 후 `sbh-platform`, 서울, S3 Backend에서 47 add / 0 change / 0 destroy. Public Subnet과 수동 EIP 없음 |
 | Apply와 배포 | 사용자 지시로 수행하지 않음 |
-| 커밋과 푸시 | 기존 구현 커밋 `c1a36ed` 확인. 후속 Unit 5 변경은 `main`에 커밋하고 원격 SHA 확인 |
+| 커밋과 푸시 | 기존 구현 커밋 `c1a36ed` 확인. 후속 Unit 5와 6 변경은 `main`에 커밋하고 원격 SHA 확인 |
 
-사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 Ideation, Inception과 각 Unit의 Design 및 Implementation Plan 승인을 포함합니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
+초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit 5와 6의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
 
 ## 1. Ideation
 
@@ -201,4 +201,49 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 | 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-port-8000.tfplan > .local/dev-port-8000.tfplan.json` 후 Python 인라인 점검 | Listener 80, Target Group과 ALB/ECS 규칙 8000, Health Check `traffic-port`, 초기 ECS Service 생략 확인 |
 | 2026-10-01 | `git diff --check` | PASS |
 | 2026-10-01 | `git commit -m "fix: align dev backend port to 8000"` | dev 포트 변경과 문서 커밋 완료 |
+| 2026-10-01 | `git push origin main`, `git ls-remote origin refs/heads/main` | 원격 `main` 푸시 및 SHA 일치 확인 |
+
+## 후속 변경: dev Regional NAT와 private-only VPC
+
+### Ideation: 승인됨
+
+- 문제 정의: 기존 dev는 Public Subnet 2개에 Zonal NAT 2개를 배치했습니다. 배포 플랫폼 VPC에서 불필요한 Public Subnet을 없애고 Regional NAT로 외부 송신을 제공해야 합니다.
+- 사용자: dev 배포 플랫폼 운영자와 CloudFront를 통해 서비스를 이용하는 사용자입니다.
+- 성공 기준: dev VPC에 Public Subnet과 Public Route Table이 없고, App과 DB는 Private Subnet에 유지됩니다. App만 Regional NAT로 인터넷에 송신하고 DB에는 기본 경로가 없습니다. ALB는 Internal이며 ECS Task에는 Public IP를 할당하지 않습니다.
+- Scope: `env/dev` Network 호출, 결합 mock Plan과 전체 Plan 점검, 관련 README, AI-DLC와 Runbook, 실제 AWS Plan 검토입니다.
+- Non-goals: 재사용 Network 모듈의 인터페이스 변경, stg/prd 구성, VPC Endpoint와 새 보안 그룹 정책, Terraform Apply와 배포입니다. 커밋과 푸시는 후속 요청으로 범위에 추가됐습니다.
+- 승인: 2026-10-01 사용자가 이 범위와 private-only의 의미를 승인했습니다. 여기서 private-only는 워크로드와 ALB에 Public Subnet 및 Public IP가 없다는 뜻입니다. Regional NAT의 인터넷 송신과 CloudFront VPC Origin을 위해 VPC에는 Internet Gateway가 연결됩니다.
+
+### Inception: 승인됨
+
+- Functional Requirements: dev의 `nat_gateway_mode`를 `regional`로 설정하고 Public Subnet과 Zonal NAT 배치 입력을 제거합니다. App Subnet 2개의 기본 경로는 같은 Regional NAT ID를 사용하고 DB Subnet 2개에는 인터넷 기본 경로를 만들지 않습니다. 기존 App, DB CIDR과 AZ를 유지합니다. `network.public_subnet_ids`는 빈 Map을 반환하고 `network.nat_gateway_ids`는 두 AZ 키가 같은 NAT ID를 가리킵니다.
+- Non-Functional Requirements: 직접 인터넷 수신 경로를 만들지 않습니다. Regional NAT는 AWS가 AZ와 송신 IP를 관리하며, 한 리소스여도 활성 AZ별 시간 요금과 데이터 처리 요금이 발생합니다. 기존 모듈 기능을 재사용하고 새 추상화나 Provider 의존성을 추가하지 않습니다.
+- Architecture: CloudFront VPC Origin → Internal ALB → App Private Subnet → DB Private Subnet입니다. App의 HTTPS 송신만 Regional NAT → Internet Gateway를 사용합니다. DB에는 기본 경로가 없습니다. CloudFront VPC Origin에는 Internet Gateway가 VPC에 연결되어 있어야 하지만 ALB 서브넷의 인터넷 경로로 사용하지 않습니다.
+- Unit of Work: 단일 Unit으로 dev Network 호출, 검증과 문서 갱신을 묶습니다.
+- Acceptance Criteria: mock Plan에서 Public Subnet, Public Route Table, Public 기본 경로, Public Route Table 연결과 Terraform 관리 EIP가 각각 0개입니다. Internet Gateway 1개, Regional NAT 1개, Private Subnet 4개, App의 Regional NAT 기본 경로 2개와 DB 기본 경로 0개를 확인합니다. NAT의 `availability_mode`는 `regional`이며 두 App 경로가 동일 NAT ID를 가리킵니다. Internal ALB, ECS Public IP 비활성화와 기존 접근 규칙을 유지합니다. fmt, validate, dev mock과 전체 Plan 점검을 실행하고 실제 AWS Plan에서 생성, 변경, 삭제 및 교체를 확인합니다.
+
+### Construction Unit 6: 승인된 Design과 Implementation Plan
+
+- Design: 이미 구현된 `modules/network`의 Regional NAT 경로를 사용합니다. `env/dev/main.tf`에서 `public_subnets`와 `zonal_nat_subnet_keys`를 제거하고 모드만 변경합니다. Network 모듈과 출력 구조는 유지하며 `public_subnet_ids`는 빈 Map으로 남깁니다. `env/dev/security.tf`의 NAT 경로 설명을 현재 구성에 맞춥니다.
+- Implementation Plan: dev 결합 mock의 Zonal NAT override를 Regional NAT override로 바꾸고 `env/dev/tests-terraform-1.17/platform.tftest.hcl`과 `scripts/check-dev-test-plan.py`에서 Public 리소스 부재, Regional NAT와 App/DB 경로를 검증합니다. `env/dev/README.md`, 이 AI-DLC 문서, `docs/README.md`와 Runbook을 실제 구성과 검증 결과에 맞춰 갱신합니다. Terraform fmt, validate, dev mock, 전체 Plan 점검, 실제 AWS Plan을 차례로 실행한 뒤 diff와 Plan을 Review합니다.
+- Approval: 2026-10-01 사용자가 Inception과 이 Unit의 Design 및 Implementation Plan을 승인했습니다.
+- Implementation: dev Root Module에서 Public Subnet과 Zonal NAT 선택을 제거하고 Regional NAT를 선택했습니다. 결합 mock과 전체 Plan 점검을 Regional NAT, App 기본 경로 2개, DB 격리에 맞췄습니다. 기존 모듈의 코드는 변경하지 않았습니다.
+- Test: `terraform fmt`, 허용된 환경의 `terraform validate`, dev mock 6개와 전체 Plan 점검 3개가 통과했습니다. 실제 AWS Plan은 47개 생성, 변경과 삭제 0개입니다.
+- Review: 실제 Plan에는 Private Subnet 4개, Internet Gateway 1개, Regional NAT 1개, App의 Regional 기본 경로 2개가 있습니다. Public Subnet, Public Route Table과 경로, Terraform 관리 EIP, DB 기본 경로는 없습니다. ALB는 Internal, RDS는 비공개이며 초기 ECS Service와 Task Definition은 없습니다. mock Plan에서 활성화된 ECS Task의 Public IP 비활성화를 확인했습니다.
+- Operation: Apply와 배포는 이 Unit에 포함하지 않습니다. 향후 기존 Zonal NAT에서 실제 전환한다면 연결 재설정과 송신 IP 변경 가능성을 검토하고, Plan에서 State 기준 삭제와 교체를 확인한 후 별도 승인으로 진행합니다.
+- Git: 후속 요청에 따라 변경을 `main`에 커밋하고 푸시했습니다. 로컬 HEAD와 원격 main의 SHA 일치를 확인했습니다.
+
+### Unit 6 검증 기록
+
+| 날짜 | 명령 | 결과 |
+|---|---|---|
+| 2026-10-01 | `terraform fmt -check -recursive env/dev` | PASS |
+| 2026-10-01 | `terraform -chdir=env/dev validate -no-color` | Sandbox에서 Provider 기동 실패. 허용된 환경 재실행 PASS |
+| 2026-10-01 | `.local/terraform-1.17.0-beta2/terraform -chdir=env/dev test -test-directory=tests-terraform-1.17 -no-color -verbose -json > .local/dev-regional-nat-tests.jsonl` | mock 6 PASS, 0 FAIL |
+| 2026-10-01 | `python3 scripts/check-dev-test-plan.py .local/dev-regional-nat-tests.jsonl` | 초기 구성과 서비스 활성화 구성의 전체 Plan 점검 3 PASS |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 sts get-caller-identity --query '{Account:Account,Arn:Arn}' --output json` | 계정 `723225040786` 확인 |
+| 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-regional-nat.tfplan > .local/dev-regional-nat-plan.log` | 종료 코드 2, 47 add / 0 change / 0 destroy |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-regional-nat.tfplan > .local/dev-regional-nat.tfplan.json` 후 Python 점검 | Public 리소스 부재, Regional NAT 1개, App 경로 2개, ALB/RDS 비공개와 초기 ECS Service 생략 확인 |
+| 2026-10-01 | `git diff --check` | PASS |
+| 2026-10-01 | `git commit -m "feat: switch dev to regional NAT"` | Unit 6 변경 커밋 완료 |
 | 2026-10-01 | `git push origin main`, `git ls-remote origin refs/heads/main` | 원격 `main` 푸시 및 SHA 일치 확인 |

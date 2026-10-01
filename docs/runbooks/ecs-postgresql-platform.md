@@ -6,7 +6,7 @@
 
 ## 배포 순서
 
-1. `sbh-platform` 인증, 서울 리전과 기존 S3 Backend를 확인해요. State Key는 dev 전용으로 유지해요. `AWS_PROFILE=sbh-platform ./tf dev plan`에서 변경과 삭제, 비용이 발생하는 NAT 2개, ALB, RDS Multi-AZ를 검토해요.
+1. `sbh-platform` 인증, 서울 리전과 기존 S3 Backend를 확인해요. State Key는 dev 전용으로 유지해요. `AWS_PROFILE=sbh-platform ./tf dev plan`에서 변경과 삭제, 활성 AZ별 비용이 발생하는 Regional NAT 1개, ALB, RDS Multi-AZ를 검토해요.
 2. 후속 Apply 승인 후 인프라 준비 구성을 적용해요. `backend_image_digest = null`이면 Task Definition과 Service는 없어요. ALB Target이 비어 있으므로 `/api`의 503은 이 단계의 예상 상태예요.
 3. VPC 내부에서 DB에 접속할 수 있는 별도 관리 경로를 준비해요. 현재 Terraform에는 DB 접근용 공개 포트, Bastion과 관리자 ECS Task가 없어요. RDS 관리자 Secret으로 접속해 `sbhapp` DB의 앱 전용 사용자를 만들고 필요한 스키마 권한만 부여해요. 관리자 계정을 앱에서 사용하지 않아요.
 4. 앱 Secret에 `username`, `password` JSON 키를 Secrets Manager의 승인된 운영 경로로 등록해요. Terraform에는 Secret 메타데이터만 있어요. Terraform 변수, 출력, 명령행 인자와 로그에 암호를 넣지 않아요. RDS 관리자 Secret과 앱 Secret은 별개예요.
@@ -26,10 +26,12 @@ Terraform의 AWS 실행은 `sbh-platform` 프로필을 사용해요. AWS CLI의 
 | CloudFront -> ALB | CloudFront origin-facing 관리형 Prefix List, TCP 80 |
 | ALB -> ECS | ALB/ECS Security Group 참조, 기본 TCP 8000 |
 | ECS -> RDS | ECS/DB Security Group 참조, TCP 5432 |
-| ECS -> 인터넷 | TCP 443, 같은 AZ의 NAT |
+| ECS -> 인터넷 | TCP 443, Regional NAT |
 | 인터넷 -> DB | 경로와 허용 규칙 없음 |
 
 CloudFront가 생성하는 `CloudFront-VPCOrigins-Service-SG`는 AWS 관리 대상이므로 수정하지 않아요. 현재는 관리형 Prefix List를 사용하며 특정 Distribution 제한은 S3 OAC 버킷 정책에 적용해요. Prefix List 규칙은 SG 할당량을 크게 사용하므로 포트를 추가하기 전에 할당량을 확인해요. [VPC Origin 접근 규칙](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html)
+
+VPC에는 Public Subnet과 Public Route Table이 없어요. Regional NAT와 CloudFront VPC Origin을 위해 Internet Gateway는 연결하지만 App과 DB Subnet에는 Internet Gateway 기본 경로가 없어요. Regional NAT가 사용하는 송신 IP는 AWS가 관리해요. 기존 Zonal NAT를 배포한 환경에서 실제 전환할 때는 송신 IP 허용 목록과 연결 재설정을 확인하고, 새 NAT로 경로를 바꾼 뒤 이전 NAT를 제거하는 순서를 Plan과 작업 창에서 검토해요. [Regional NAT 전환](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateways-regional.html)
 
 ## 모니터링
 
@@ -37,7 +39,7 @@ CloudFront가 생성하는 `CloudFront-VPCOrigins-Service-SG`는 AWS 관리 대�
 - ALB: Healthy/UnHealthy Host 수, Target 5xx, ALB 5xx와 응답 지연을 확인해요.
 - CloudFront: 4xx/5xx와 API 지연을 확인해요. 오류는 SPA HTML로 바꾸지 않아요.
 - RDS: DB 상태, 장애 전환 이벤트, CPU, FreeableMemory, FreeStorageSpace와 DatabaseConnections를 확인해요. 백업은 7일 보존해요.
-- NAT: AZ별 NAT 상태, ErrorPortAllocation, 연결 수와 데이터 처리량을 확인해요.
+- NAT: Regional NAT의 AZ별 확장 상태, ErrorPortAllocation, 연결 수와 데이터 처리량을 확인해요.
 
 알림 채널, CloudWatch Alarm, ALB/CloudFront 액세스 로그, 대시보드는 이번 구현 범위에 없어요. 후속 운영 작업에서 기준과 수신 대상을 정해요.
 

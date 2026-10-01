@@ -2,7 +2,7 @@
 
 마지막 확인일: 2026-10-01
 
-이 저장소는 환경별 Terraform 실행기와 재사용 가능한 AWS Terraform 모듈을 제공합니다. `env/dev`에 ECS와 PostgreSQL Multi-AZ Root Module을 구현했습니다. dev 백엔드 내부 포트 기본값을 8000으로 바꾼 뒤 `sbh-platform` 실제 AWS Plan은 56개 생성, 변경과 삭제 0개였습니다. Apply와 배포는 하지 않았습니다. `env/stg`와 `env/prd`는 아직 Root Module이 없습니다.
+이 저장소는 환경별 Terraform 실행기와 재사용 가능한 AWS Terraform 모듈을 제공합니다. `env/dev`에 ECS와 PostgreSQL Multi-AZ Root Module을 구현했습니다. dev를 Public Subnet 없는 Regional NAT 구성으로 변경한 뒤 `sbh-platform` 실제 AWS Plan은 47개 생성, 변경과 삭제 0개였습니다. Apply와 배포는 하지 않았습니다. `env/stg`와 `env/prd`는 아직 Root Module이 없습니다.
 
 ## 새 세션에서 확인할 순서
 
@@ -55,9 +55,10 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 | KMS 모듈 | Unit 1 구현, Test, Review 완료 | 포맷, 구성 검증 통과, mock 테스트 10개 통과 | 실제 AWS 기준 미수행 | 구현 커밋 `2b1f850` 원격 main 확인 | [KMS AI-DLC](./ai-dlc/kms-module.md) |
 | EKS 및 클러스터 공통 구성 | Unit 1, 2 구현, Test, Review 완료. Unit 3~5 미시작 | 두 Unit 포맷, 구성 검증 통과, 각 mock Plan 16개 통과 | 실제 AWS 기준 미수행 | Unit 1 `15fe220`, Unit 2 `4c6c680` 원격 main 확인 | [EKS AI-DLC](./ai-dlc/eks-module.md) |
 | ECS와 CloudFront 모듈 | 구현과 Review 완료 | ECS mock 6개, CloudFront mock 3개, SPA 14개 통과 | dev 결합 실제 Plan 확인, Apply 미수행 | 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
-| 환경별 Root Module | dev ECS/PostgreSQL 구현 완료, stg/prd 미구현 | fmt, validate, 결합 mock 3개와 전체 Plan 점검 2개 통과 | sbh-platform dev 56 add / 0 change / 0 destroy, Apply 미수행 | 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
+| 환경별 Root Module | dev ECS/PostgreSQL 구현 완료, stg/prd 미구현 | 최신 dev fmt, validate, mock 6개와 전체 Plan 점검 3개 통과 | sbh-platform dev 47 add / 0 change / 0 destroy, Apply 미수행 | Regional NAT 변경을 `main`에 커밋, 원격 SHA 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md) |
 | dev 네이밍과 태깅 | `env/dev`와 연결 모듈에 규칙 반영 | validate, 결합 mock 5개, 전체 Plan 점검 2개, ALB 15개, SG 8개, ECS 6개, IAM Role 5개 통과 | 56 add / 0 change / 0 destroy, 42개 리소스 계획 태그 확인. Apply 미수행 | `main` 커밋 및 원격 SHA 확인 | [네이밍과 태깅 AI-DLC](./ai-dlc/dev-naming-tagging.md) |
 | dev 백엔드 내부 포트 | 기본값 8000 반영. ALB Listener 80 유지 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 변경 후 56 add / 0 change / 0 destroy, Target Group과 ALB/ECS 규칙 8000 확인. Apply 미수행 | `main` 커밋 및 원격 SHA 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-백엔드-내부-포트-8000) |
+| dev Regional NAT와 private-only VPC | Unit 6 구현, Test와 Review 완료 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 47 add / 0 change / 0 destroy, Apply 미수행 | `main` 커밋과 푸시 완료, 원격 SHA 확인 | [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-regional-nat와-private-only-vpc) |
 | 지속 문서화 | RDS, ECR 진행 상태 반영, 기존 10개 모듈 README의 입력, 출력 속성 표 정리와 향후 유지 규칙 추가 | 입력 97개, 출력 49개 코드 대조 및 문서 공백 점검 완료 | 해당 없음 | ECR, README 표, 규칙 커밋 `3f6dbdd` 원격 main 확인 | 이 문서 |
 
 IAM 구현 커밋 `2190a91`을 푸시한 직후 로컬 `HEAD`, `origin/main`, 원격 main의 SHA가 모두 `2190a91b4e6023492d71023f6c69a959d1a825b3`인 것을 확인했습니다.
@@ -116,7 +117,7 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ## ECS와 PostgreSQL dev 구성
 
-[dev README](../env/dev/README.md)에 입력, 출력, Backend와 실행 방법을 정리했습니다. 두 AZ의 Public/App/DB Subnet, NAT 2개, Internal ALB, Fargate 준비 구성, PostgreSQL Multi-AZ와 CloudFront/S3를 연결했습니다. 초기 Task Definition과 Service는 0개이며 이미지 Digest와 앱 DB 계정이 준비된 후 활성화할 수 있습니다. [Runbook](./runbooks/ecs-postgresql-platform.md)에 후속 배포와 장애 검증 절차를 기록했습니다.
+[dev README](../env/dev/README.md)에 입력, 출력, Backend와 실행 방법을 정리했습니다. 두 AZ의 App/DB Private Subnet, Regional NAT 1개, Internal ALB, Fargate 준비 구성, PostgreSQL Multi-AZ와 CloudFront/S3를 연결했습니다. Public Subnet은 만들지 않습니다. 초기 Task Definition과 Service는 0개이며 이미지 Digest와 앱 DB 계정이 준비된 후 활성화할 수 있습니다. [Runbook](./runbooks/ecs-postgresql-platform.md)에 후속 배포와 장애 검증 절차를 기록했습니다.
 
 현재 dev 기본 포트는 ALB Listener 80에서 백엔드 Target Group과 ECS 컨테이너 8000으로 전달합니다. 초기 구성에는 ECS Service가 없으며, 활성화 시 컨테이너 포트는 mock Plan으로 검증했습니다.
 
@@ -150,11 +151,13 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ## 현재 작업과 다음 단계
 
-ECS/PostgreSQL dev 구현과 로컬 검증, 실제 AWS Plan 검토를 완료했습니다. mock Plan 26개, SPA 14개와 결합 Plan 점검 2개가 통과했습니다. dev 결합 mock은 기존 RDS의 ephemeral 선언 때문에 공식 Terraform 1.17.0-beta2로 실행했고 실제 Plan은 안정 버전 1.16.4로 실행했습니다. 상세 날짜와 명령은 [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md)에 있습니다.
+dev Regional NAT와 private-only VPC 전환의 Ideation, Inception과 단일 Unit 계획을 2026-10-01 승인받았습니다. Public Subnet을 없애고 App의 송신만 Regional NAT로 보내는 구현, 로컬 mock 검증과 실제 AWS Plan 검토를 마쳤습니다. Plan은 47개 생성, 변경과 삭제 0개입니다. 후속 요청에 따라 변경을 `main`에 커밋하고 푸시해 원격 SHA를 확인했습니다. Apply는 수행하지 않았습니다. [검증 기록](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-regional-nat와-private-only-vpc)을 확인하세요.
+
+기존 ECS/PostgreSQL dev 구축 당시 mock Plan 26개, SPA 14개와 결합 Plan 점검 2개가 통과했습니다. dev 결합 mock은 기존 RDS의 ephemeral 선언 때문에 공식 Terraform 1.17.0-beta2로 실행했고 당시 실제 Plan은 안정 버전 1.16.4로 실행했습니다. 상세 날짜와 명령은 [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md)에 있습니다.
 
 이전 ECS/PostgreSQL 구현 커밋 `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`은 `codex/ecs-postgresql-dev`에 푸시됐습니다. 이후 제공한 네이밍과 태깅 규칙을 `env/dev`와 연결 모듈에 적용해 로컬 검증과 실제 AWS Plan 검토를 마쳤습니다. 이 변경은 `main`에 커밋하고 원격 SHA 일치를 확인했습니다. 이번 백엔드 내부 포트 8000 변경도 로컬 검증과 실제 AWS Plan 검토를 마치고 `main`에 커밋해 원격 SHA 일치를 확인했습니다. 상세 범위와 검증은 [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-백엔드-내부-포트-8000)에 기록했습니다.
 
-1. ADR의 팀 승인 상태는 별도로 확인합니다. 실제 Plan에서 56개 생성, 변경과 삭제 0개, 태그 지원 리소스 42개의 `tags_all`을 확인했습니다.
+1. ADR의 팀 승인 상태는 별도로 확인합니다.
 2. 별도 배포 요청을 받은 후 인프라 Apply를 진행합니다. 이번 작업은 Apply, 업로드, DB 계정 생성, ECS 시작과 장애 전환을 수행하지 않았습니다.
 3. 앱 이미지, DB 사용자/Secret과 프론트 빌드를 준비한 뒤 서비스 활성화 Plan을 검토하고 실제 두 AZ 배치와 API/DB 접속을 검증합니다.
 4. EKS의 미완료 Unit 3~5와 stg/prd Root Module은 기존 후속 작업으로 남깁니다. 일반 RDS RR의 모듈 소유 Secret 회전/복구도 별도 운영 작업입니다.

@@ -13,14 +13,15 @@ flowchart LR
   cf -->|/api, /api/* VPC Origin| alb[Internal ALB HTTP 80]
   alb -->|TCP 8000| ecs[Fargate App Private, Task 2개]
   ecs -->|TCP 5432| rds[PostgreSQL DB Private, Multi-AZ]
-  ecs -->|HTTPS| nat[AZ별 NAT Gateway]
+  ecs -->|HTTPS| nat[Regional NAT Gateway]
 ```
 
 | 계층 | ap-northeast-2a | ap-northeast-2c | 인터넷 경로 |
 |---|---|---|---|
-| Public | `10.20.0.0/24` | `10.20.1.0/24` | IGW, AZ별 NAT |
-| App Private | `10.20.10.0/24` | `10.20.11.0/24` | 같은 AZ의 NAT |
+| App Private | `10.20.10.0/24` | `10.20.11.0/24` | Regional NAT |
 | DB Private | `10.20.20.0/24` | `10.20.21.0/24` | 기본 경로 없음 |
+
+Public Subnet과 Public Route Table은 만들지 않아요. Regional NAT는 VPC에 하나를 만들고 두 App Subnet이 같은 NAT ID를 사용해요. NAT가 인터넷으로 송신하고 CloudFront VPC Origin을 만들 수 있도록 Internet Gateway는 VPC에 연결해요. App, DB와 Internal ALB에는 직접 인터넷 수신 경로가 없어요. Regional NAT의 송신 IP는 AWS가 관리하며 요금은 활성 AZ별로 발생해요. [AWS Regional NAT](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateways-regional.html), [CloudFront VPC Origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html), [NAT 요금](https://aws.amazon.com/vpc/pricing/)
 
 DB는 PostgreSQL 17.11, db.t4g.small, gp3 20 GiB예요. 자동 장애 전환용 Primary와 Standby를 구성하고 읽기 복제본은 만들지 않아요. 암호화, 7일 백업, 삭제 보호와 최종 스냅샷을 사용해요.
 
@@ -49,7 +50,7 @@ CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가
 
 | 속성 | 역할 |
 |---|---|
-| `network` | VPC, Public/App/DB Subnet과 AZ별 NAT 식별 정보예요. |
+| `network` | VPC, App/DB Private Subnet과 Regional NAT 식별 정보예요. |
 | `frontend` | S3 버킷, CloudFront Distribution ID와 HTTPS 주소예요. |
 | `backend` | ECR, ECS, 로그 그룹, ALB와 IAM Role 식별 정보예요. 초기 Service와 Task Definition은 `null`이에요. |
 | `database` | DB 식별자, 주소, 포트, 이름과 관리자/앱 Secret ARN이에요. Secret 값은 출력하지 않아요. |
@@ -57,10 +58,10 @@ CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가
 | 출력 객체 | 내부 속성 | 역할 |
 |---|---|---|
 | `network` | `vpc_id` | VPC ID예요. |
-| `network` | `public_subnet_ids` | Public Subnet 논리 키별 ID예요. |
+| `network` | `public_subnet_ids` | 호환성을 위해 유지하며 현재 dev에서는 빈 Map이에요. |
 | `network` | `app_subnet_ids` | 두 AZ의 App Subnet ID예요. |
 | `network` | `db_subnet_ids` | 두 AZ의 DB Subnet ID예요. |
-| `network` | `nat_gateway_ids` | AZ별 NAT ID예요. |
+| `network` | `nat_gateway_ids` | 두 App AZ 키가 같은 Regional NAT ID를 가리켜요. |
 | `frontend` | `bucket_name` | 프론트엔드 버킷 이름이에요. 계정 ID로 고유성을 확보해요. |
 | `frontend` | `distribution_id` | CloudFront ID예요. |
 | `frontend` | `url` | 기본 HTTPS 주소예요. |
@@ -112,6 +113,6 @@ python3 scripts/check-dev-test-plan.py .local/dev-tests.jsonl
 node --test modules/cloudfront/tests/spa.test.cjs
 ```
 
-AWS와 Random Provider를 mock으로 대체해 자격 증명 없이 테스트해요. 기존 RDS 모듈에는 두 Provider의 ephemeral 선언이 있어 1.16.4에서 결합 mock 테스트가 실행되지 않아요. 기존 RDS 테스트와 같은 방식으로 `tests-terraform-1.17`에 테스트를 분리하고, [공식 1.17.0-beta2 테스트 CLI](https://releases.hashicorp.com/terraform/1.17.0-beta2/)를 Git 제외 폴더에 내려받아 SHA-256을 확인한 뒤 사용했어요. 모듈과 실제 Plan은 1.11 이상에서 사용해요. 네이밍과 태깅 변경 후 실제 Plan은 안정 버전 1.15.4로 실행했고 56개 생성, 변경과 삭제 0개를 확인했어요. mock 테스트는 AWS 리소스나 Backend State를 만들지 않아요.
+AWS와 Random Provider를 mock으로 대체해 자격 증명 없이 테스트해요. 기존 RDS 모듈에는 두 Provider의 ephemeral 선언이 있어 1.16.4에서 결합 mock 테스트가 실행되지 않아요. 기존 RDS 테스트와 같은 방식으로 `tests-terraform-1.17`에 테스트를 분리하고, [공식 1.17.0-beta2 테스트 CLI](https://releases.hashicorp.com/terraform/1.17.0-beta2/)를 Git 제외 폴더에 내려받아 SHA-256을 확인한 뒤 사용했어요. 모듈과 실제 Plan은 1.11 이상에서 사용해요. Regional NAT 변경 후 안정 버전 1.15.4로 실행한 실제 Plan은 47개 생성, 변경과 삭제 0개예요. 이전 Zonal NAT 구성의 56개 생성 Plan과 구분해요. mock 테스트는 AWS 리소스나 Backend State를 만들지 않아요.
 
-초기 구성과 Task 활성화 구성의 전체 Plan을 검사해요. Subnet 6개, NAT 2개, DB 경로 격리, RDS Multi-AZ, Role/Secret 분리와 서비스 Task 2개를 확인해요. 배포와 운영 절차는 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)에 있어요.
+초기 구성과 Task 활성화 구성의 전체 Plan을 검사해요. Private Subnet 4개, Regional NAT 1개, Public Subnet과 수동 EIP 부재, DB 경로 격리, RDS Multi-AZ, Role/Secret 분리와 서비스 Task 2개를 확인해요. 배포와 운영 절차는 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)에 있어요.

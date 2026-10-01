@@ -19,20 +19,12 @@ module "network" {
 
   name             = local.name
   vpc_cidr         = var.vpc_cidr
-  nat_gateway_mode = "zonal"
-  public_subnets = {
-    public_a = { availability_zone = "ap-northeast-2a", cidr_block = cidrsubnet(var.vpc_cidr, 8, 0) }
-    public_c = { availability_zone = "ap-northeast-2c", cidr_block = cidrsubnet(var.vpc_cidr, 8, 1) }
-  }
+  nat_gateway_mode = "regional"
   private_subnets = {
     app_a = { availability_zone = "ap-northeast-2a", cidr_block = cidrsubnet(var.vpc_cidr, 8, 10) }
     app_c = { availability_zone = "ap-northeast-2c", cidr_block = cidrsubnet(var.vpc_cidr, 8, 11) }
     db_a  = { availability_zone = "ap-northeast-2a", cidr_block = cidrsubnet(var.vpc_cidr, 8, 20), enable_nat_route = false }
     db_c  = { availability_zone = "ap-northeast-2c", cidr_block = cidrsubnet(var.vpc_cidr, 8, 21), enable_nat_route = false }
-  }
-  zonal_nat_subnet_keys = {
-    "ap-northeast-2a" = "public_a"
-    "ap-northeast-2c" = "public_c"
   }
   tags = local.tags
 }
