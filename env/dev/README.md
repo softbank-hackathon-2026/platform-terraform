@@ -11,7 +11,7 @@ flowchart LR
   user[인터넷 사용자] --> cf[CloudFront HTTPS]
   cf -->|OAC| s3[비공개 S3]
   cf -->|/api, /api/* VPC Origin| alb[Internal ALB HTTP 80]
-  alb --> ecs[Fargate App Private, Task 2개]
+  alb -->|TCP 8000| ecs[Fargate App Private, Task 2개]
   ecs -->|TCP 5432| rds[PostgreSQL DB Private, Multi-AZ]
   ecs -->|HTTPS| nat[AZ별 NAT Gateway]
 ```
@@ -29,7 +29,7 @@ DB는 PostgreSQL 17.11, db.t4g.small, gp3 20 GiB예요. 자동 장애 전환용 
 | 속성 | 타입 | 기본값 | 역할 |
 |---|---|---|---|
 | `vpc_cidr` | `string` | `"10.20.0.0/16"` | 네트워크 주소로 정렬된 IPv4 /16 CIDR이에요. |
-| `container_port` | `number` | `8080` | ECS, ALB Target Group과 Security Group의 앱 포트예요. |
+| `container_port` | `number` | `8000` | ECS, ALB Target Group과 Security Group의 앱 포트예요. |
 | `health_check_path` | `string` | `"/api/health"` | ALB가 HTTP 200을 확인할 경로예요. |
 | `backend_image_digest` | `string` | `null` | 동일 ECR 저장소의 `sha256:...` 이미지 Digest예요. 지정하면 서비스를 활성화해요. |
 | `postgres_engine_version` | `string` | `"17.11"` | PostgreSQL 버전이에요. 변경 시 리전 지원을 다시 확인하세요. |

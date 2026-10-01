@@ -164,7 +164,7 @@ run "infrastructure_only" {
       aws_vpc_security_group_ingress_rule.cloudfront_to_alb.prefix_list_id == "pl-cloudfront" &&
       aws_vpc_security_group_ingress_rule.cloudfront_to_alb.from_port == 80 &&
       aws_vpc_security_group_ingress_rule.alb_to_ecs.referenced_security_group_id == "sg-alb" &&
-      aws_vpc_security_group_ingress_rule.alb_to_ecs.from_port == 8080 &&
+      aws_vpc_security_group_ingress_rule.alb_to_ecs.from_port == 8000 &&
       aws_vpc_security_group_ingress_rule.ecs_to_db.referenced_security_group_id == "sg-ecs" &&
       aws_vpc_security_group_ingress_rule.ecs_to_db.from_port == 5432 &&
       aws_vpc_security_group_egress_rule.ecs_https.from_port == 443 &&
@@ -173,6 +173,22 @@ run "infrastructure_only" {
       jsondecode(aws_s3_bucket_policy.frontend.policy).Statement[0].Condition.StringEquals["AWS:SourceArn"] == module.cloudfront.distribution_arn
     )
     error_message = "CloudFront -> ALB -> ECS -> RDS 접근 제한, HTTPS 송신과 S3 배포 ARN 제한을 확인해야 합니다."
+  }
+}
+
+run "activate_default_port" {
+  command = plan
+  variables {
+    backend_image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+    health_check_path    = "/api/ready"
+  }
+  assert {
+    condition = (
+      output.backend.service_name == "sbh-platform-dev-ecs-api" &&
+      aws_vpc_security_group_ingress_rule.alb_to_ecs.from_port == 8000 &&
+      aws_vpc_security_group_egress_rule.alb_to_ecs.to_port == 8000
+    )
+    error_message = "기본 백엔드 포트 8000을 ALB와 ECS 사이에 적용해야 합니다."
   }
 }
 

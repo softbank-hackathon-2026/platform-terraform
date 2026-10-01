@@ -10,7 +10,7 @@
 2. 후속 Apply 승인 후 인프라 준비 구성을 적용해요. `backend_image_digest = null`이면 Task Definition과 Service는 없어요. ALB Target이 비어 있으므로 `/api`의 503은 이 단계의 예상 상태예요.
 3. VPC 내부에서 DB에 접속할 수 있는 별도 관리 경로를 준비해요. 현재 Terraform에는 DB 접근용 공개 포트, Bastion과 관리자 ECS Task가 없어요. RDS 관리자 Secret으로 접속해 `sbhapp` DB의 앱 전용 사용자를 만들고 필요한 스키마 권한만 부여해요. 관리자 계정을 앱에서 사용하지 않아요.
 4. 앱 Secret에 `username`, `password` JSON 키를 Secrets Manager의 승인된 운영 경로로 등록해요. Terraform에는 Secret 메타데이터만 있어요. Terraform 변수, 출력, 명령행 인자와 로그에 암호를 넣지 않아요. RDS 관리자 Secret과 앱 Secret은 별개예요.
-5. Linux X86_64 이미지를 빌드하고 해당 ECR에 업로드해요. 앱은 지정 포트에서 `0.0.0.0`으로 수신하고 `/api/health`에 인증 없이 HTTP 200을 반환해야 해요. 환경변수 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`를 사용하고 `DB_SSLMODE=verify-full`에 맞춰 RDS CA 인증서를 이미지에 포함해요.
+5. Linux X86_64 이미지를 빌드하고 해당 ECR에 업로드해요. 앱은 기본 포트 8000에서 `0.0.0.0`으로 수신하고 `/api/health`에 인증 없이 HTTP 200을 반환해야 해요. 환경변수 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`를 사용하고 `DB_SSLMODE=verify-full`에 맞춰 RDS CA 인증서를 이미지에 포함해요.
 6. 이미지 Digest를 로컬 tfvars에 설정하고 새 Plan을 검토해요. Task Definition과 Service가 추가되고 Task 2개, Public IP 비활성화, 두 App Subnet, AZ 재분산이 유지되는지 확인해요. 승인 후 활성화 Apply를 진행해요.
 7. 두 AZ의 정상 Task와 ALB Target을 확인한 후 프론트 빌드 결과를 S3에 업로드해요. API는 같은 CloudFront Origin의 `/api`를 사용해요. `/assets/*`와 `/static/*`에는 콘텐츠 해시가 있는 파일명을 사용하고 HTML은 캐싱하지 않아요.
 8. CloudFront HTTPS 주소에서 SPA 직접 접근, 인증 헤더, 쿠키, Query String, POST/PATCH/DELETE와 API 4xx/5xx 응답을 검증해요. ALB Host와 전송 구간은 내부 HTTP예요. 앱의 공개 URL과 신뢰할 프록시/HTTPS 인식 설정을 CloudFront에 맞춰 구성하고 로그인 Redirect와 Secure Cookie를 확인해요.
@@ -24,7 +24,7 @@ Terraform의 AWS 실행은 `sbh-platform` 프로필을 사용해요. AWS CLI의 
 | 구간 | 허용 |
 |---|---|
 | CloudFront -> ALB | CloudFront origin-facing 관리형 Prefix List, TCP 80 |
-| ALB -> ECS | ALB/ECS Security Group 참조, 앱 TCP 포트 |
+| ALB -> ECS | ALB/ECS Security Group 참조, 기본 TCP 8000 |
 | ECS -> RDS | ECS/DB Security Group 참조, TCP 5432 |
 | ECS -> 인터넷 | TCP 443, 같은 AZ의 NAT |
 | 인터넷 -> DB | 경로와 허용 규칙 없음 |

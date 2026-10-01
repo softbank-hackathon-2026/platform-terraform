@@ -12,7 +12,7 @@ variable "vpc_cidr" {
 variable "container_port" {
   description = "ALB Target Group과 Fargate 앱의 TCP 포트입니다."
   type        = number
-  default     = 8080
+  default     = 8000
 
   validation {
     condition     = var.container_port >= 1 && var.container_port <= 65535 && floor(var.container_port) == var.container_port

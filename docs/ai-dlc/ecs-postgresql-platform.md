@@ -8,11 +8,11 @@
 |---|---|
 | Ideation | 2026-10-01 전체 구현 계획 승인 |
 | Inception | 같은 계획의 요구사항과 인터페이스 승인 |
-| Construction | Unit 1~4 구현, Test와 Review 완료 |
-| 로컬 검증 | 포맷과 validate 통과. mock Plan 26개, SPA 14개, dev 전체 Plan 점검 2개 통과 |
-| 실제 AWS Plan | `sbh-platform`, 서울, S3 Backend에서 56 add / 0 change / 0 destroy 확인 |
+| Construction | Unit 1~4 구현, Test와 Review 완료. 후속 Unit 5에서 dev 백엔드 기본 포트 8000 반영 |
+| 로컬 검증 | 기존 mock Plan 26개와 SPA 14개 통과. 후속 Unit 5의 dev mock 6개, 전체 Plan 점검 3개 통과 |
+| 실제 AWS Plan | 후속 포트 변경 후 `sbh-platform`, 서울, S3 Backend에서 56 add / 0 change / 0 destroy. Target Group과 ALB/ECS 규칙 8000 확인 |
 | Apply와 배포 | 사용자 지시로 수행하지 않음 |
-| 커밋과 푸시 | 구현 커밋 `c1a36ed`, 원격 `codex/ecs-postgresql-dev` SHA 일치 확인 |
+| 커밋과 푸시 | 기존 구현 커밋 `c1a36ed` 확인. 후속 Unit 5 변경은 `main`에 커밋하고 원격 SHA 확인 |
 
 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 Ideation, Inception과 각 Unit의 Design 및 Implementation Plan 승인을 포함합니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
 
@@ -34,7 +34,7 @@
 - CloudFront는 OAC로 비공개 S3에 접근하며 `/api`와 `/api/*`는 VPC Origin으로 Internal ALB에 전달합니다.
 - SPA의 확장자가 없는 프론트 경로는 `/index.html`로 변환하고 API 오류 응답은 보존합니다. HTML과 API는 캐싱하지 않고 `/assets/*`와 `/static/*`는 캐싱합니다.
 - ECS는 Cluster와 로그 그룹을 항상 생성합니다. `service = null`이면 Task Definition과 Service는 생성하지 않습니다. 서비스 활성화 구성은 Linux X86_64, On-Demand Fargate, CPU 512, 메모리 1024 MiB, Task 2개, Public IP 비활성화와 AZ 재분산을 사용합니다.
-- Internal ALB는 두 App Subnet, HTTP 80 Listener와 IP Target Group을 사용합니다. 기본 앱 포트는 8080, 상태 확인 경로는 `/api/health`입니다.
+- Internal ALB는 두 App Subnet, HTTP 80 Listener와 IP Target Group을 사용합니다. 후속 Unit 5에서 변경한 기본 앱 포트는 8000, 상태 확인 경로는 `/api/health`입니다.
 - PostgreSQL은 17.11, db.t4g.small, gp3 20 GiB, Multi-AZ, 암호화, 백업 7일, 삭제 보호와 최종 스냅샷을 사용합니다. Read Replica는 생성하지 않습니다.
 - 관리자 암호는 RDS에서 관리하고 앱 Secret은 메타데이터만 Terraform에서 관리합니다. Execution Role에는 ECR, 로그와 앱 Secret 권한만 연결합니다.
 - AWS Provider와 S3 Backend는 `sbh-platform`을 사용합니다. Backend는 기존 별도 버킷, 암호화와 S3 잠금 파일을 사용하며 버킷과 State Key는 사용자 입력을 받습니다.
@@ -154,3 +154,51 @@ Backend 버킷은 사용자가 지정한 `sbh-platform-prod-s3-tf`, Key는 추�
 | 2026-10-01 | `git ls-remote origin refs/heads/codex/ecs-postgresql-dev` | 원격 SHA `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`, 구현 커밋과 일치 |
 
 Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되어 허용된 실행 환경에서 재시도했습니다. 최초 Network 테스트의 빈 NAT 대상 비교와 mock Plan의 unknown 비교를 수정한 뒤 관련 테스트를 다시 실행했습니다. 최종 결과만 PASS로 표시했으며 Apply와 배포 결과는 없습니다.
+
+## 후속 변경: dev 백엔드 내부 포트 8000
+
+### Ideation
+
+- 문제 정의: 백엔드가 수신할 포트가 8000으로 예정되어 기존 dev 기본값 8080과 다릅니다.
+- 사용자: 백엔드 배포 담당자와 dev 인프라 운영자입니다.
+- 성공 기준: dev 기본 구성의 ALB Target Group, ALB와 ECS 사이 보안 그룹 규칙, ECS Task의 컨테이너 포트가 8000으로 일치합니다.
+- Scope: dev Root Module 기본값, 결합 테스트와 관련 README, Runbook, AI-DLC 상태 기록입니다.
+- Non-goals: 외부 ALB Listener 80 변경, 재사용 ECS 모듈의 기본값 변경, Apply와 실제 배포입니다.
+
+### Inception
+
+- Functional Requirements: `env/dev`의 `container_port` 기본값을 8000으로 설정합니다. 현재 `var.container_port`를 참조하는 Target Group, 보안 그룹 규칙과 ECS Service 입력은 그대로 사용합니다.
+- Non-Functional Requirements: 별도 포트를 지정하는 호출자의 재정의 기능, `/api/health` 상태 확인 경로, CloudFront와 ALB의 외부 경로를 유지합니다.
+- Architecture: CloudFront에서 Internal ALB HTTP 80까지는 기존 경로를 사용하고, ALB에서 Fargate 컨테이너까지 TCP 8000을 사용합니다.
+- Unit of Work: 단일 Unit으로 기본값, 기본 포트와 재정의 포트의 mock 검증, 문서와 실제 AWS Plan 검토를 묶습니다.
+- Acceptance Criteria: 기본 구성의 Target Group과 보안 그룹 규칙, 서비스 활성화 구성의 Task 포트가 8000입니다. 명시적 9090 재정의도 유지하고, 실제 AWS Plan의 변경과 교체 여부를 확인합니다.
+
+### Construction Unit 5
+
+- Design: 포트의 단일 원천인 dev `container_port` 기본값만 바꾸고 연결 모듈의 범용 기본값은 유지합니다.
+- Implementation Plan: 기본값과 테스트 기대값을 바꾸고, 기본 포트로 서비스를 활성화한 mock Plan을 추가한 뒤 관련 문서를 갱신합니다. fmt, validate, dev mock, Plan 검사와 실제 AWS Plan을 실행합니다.
+- Approval: 2026-10-01 사용자가 백엔드 내부 포트 8000과 이 변경 계획을 승인했습니다.
+- Implementation: dev `container_port` 기본값을 8000으로 바꿨습니다. 기본 포트로 ECS 서비스를 활성화하는 mock run을 추가했고, 명시적 9090 재정의 run은 유지했습니다. dev README와 Runbook을 갱신했습니다.
+- Test: Terraform fmt와 validate, dev mock 6개, 전체 Plan 점검 3개가 통과했습니다. 실제 AWS Plan은 56개 생성, 변경과 삭제 0개입니다.
+- Review: 실제 Plan의 ALB Listener는 80, Target Group과 ALB/ECS 규칙은 8000이며 Health Check 포트는 `traffic-port`입니다. 초기 구성에 ECS Service와 Task Definition은 없고, 서비스 활성화 시 Task의 8000 포트는 mock Plan으로 확인했습니다.
+
+### Operation과 Git 상태
+
+- Deployment와 Observability: Apply와 배포는 미수행입니다. 서비스 활성화 후 앱이 `0.0.0.0:8000`에서 수신하고 `/api/health`에 응답하는지 확인해야 합니다.
+- Rollback: Apply 전에는 기본값을 되돌릴 수 있습니다. Apply 이후에는 Target Group 이름과 교체 순서를 실제 State와 Plan으로 검토합니다.
+- Git: 이번 포트 변경을 `main`에 커밋하고 원격 SHA 일치를 확인했습니다.
+
+### 후속 변경 검증 기록
+
+| 날짜 | 명령 | 결과 |
+|---|---|---|
+| 2026-10-01 | `terraform fmt -check -recursive env/dev` | PASS |
+| 2026-10-01 | `terraform -chdir=env/dev validate -no-color` | PASS |
+| 2026-10-01 | `.local/terraform-1.17.0-beta2/terraform -chdir=env/dev test -test-directory=tests-terraform-1.17 -no-color -verbose -json > .local/dev-port-8000-tests.jsonl` | mock 6 PASS, 0 FAIL |
+| 2026-10-01 | `python3 scripts/check-dev-test-plan.py .local/dev-port-8000-tests.jsonl` | 초기 구성, 기본 포트 서비스, 9090 재정의의 전체 Plan 점검 3 PASS |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 sts get-caller-identity` | 계정 `723225040786` 확인 |
+| 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-port-8000.tfplan > .local/dev-port-8000-plan.log` | 종료 코드 2, 56 add / 0 change / 0 destroy |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-port-8000.tfplan > .local/dev-port-8000.tfplan.json` 후 Python 인라인 점검 | Listener 80, Target Group과 ALB/ECS 규칙 8000, Health Check `traffic-port`, 초기 ECS Service 생략 확인 |
+| 2026-10-01 | `git diff --check` | PASS |
+| 2026-10-01 | `git commit -m "fix: align dev backend port to 8000"` | dev 포트 변경과 문서 커밋 완료 |
+| 2026-10-01 | `git push origin main`, `git ls-remote origin refs/heads/main` | 원격 `main` 푸시 및 SHA 일치 확인 |

@@ -12,7 +12,7 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def check_plan(plan, active):
+def check_plan(plan, active, port):
     resources = {
         r["address"]: r for r in plan["resource_changes"] if r["mode"] == "managed"
     }
@@ -109,7 +109,6 @@ def check_plan(plan, active):
     require(alb["internal"] is True and alb["subnets"] == ["subnet-app-a", "subnet-app-c"], "ALB must be internal in app subnets")
     target = attrs('module.alb.aws_lb_target_group.this["api"]')
     require(target["name"] == "sbh-platform-dev-tg-api" and len(target["name"]) <= 32, "Target group naming mismatch")
-    port = 9090 if active else 8080
     require(target["target_type"] == "ip" and target["port"] == port, "Fargate requires the correct IP target group")
     require(target["health_check"][0]["path"] == ("/api/ready" if active else "/api/health"), "Health path must propagate")
     require(attrs('module.alb.aws_lb_listener.forward["http"]')["port"] == 80, "ALB listener must be HTTP 80")
@@ -155,11 +154,11 @@ def check_plan(plan, active):
 def main(path):
     events = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
     summaries = [e["test_summary"] for e in events if e["type"] == "test_summary"]
-    require(summaries and summaries[-1]["status"] == "pass" and summaries[-1]["passed"] == 5, "Terraform tests must all pass first")
+    require(summaries and summaries[-1]["status"] == "pass" and summaries[-1]["passed"] == 6, "Terraform tests must all pass first")
     plans = {e["@testrun"]: e["test_plan"] for e in events if e["type"] == "test_plan"}
-    for name, active in [("infrastructure_only", False), ("activate_two_tasks", True)]:
+    for name, active, port in [("infrastructure_only", False, 8000), ("activate_default_port", True, 8000), ("activate_two_tasks", True, 9090)]:
         require(name in plans, f"Missing mock plan: {name}")
-        check_plan(plans[name], active)
+        check_plan(plans[name], active, port)
         print(f"PASS: {name} full plan network, security, database and service checks")
 
 
