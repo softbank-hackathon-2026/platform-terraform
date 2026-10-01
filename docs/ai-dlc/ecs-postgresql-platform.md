@@ -6,15 +6,17 @@
 
 | 구분 | 상태 |
 |---|---|
-| Ideation | 2026-10-01 전체 구현 계획 승인 |
-| Inception | 같은 계획의 요구사항과 인터페이스 승인 |
-| Construction | Unit 1~4 구현, Test와 Review 완료. 후속 Unit 5에서 dev 백엔드 기본 포트 8000, Unit 6에서 Regional NAT 반영 |
-| 로컬 검증 | 기존 mock Plan 26개와 SPA 14개 통과. 최신 dev mock 6개, 전체 Plan 점검 3개 통과 |
-| 실제 AWS Plan | Regional NAT 변경 후 `sbh-platform`, 서울, S3 Backend에서 47 add / 0 change / 0 destroy. Public Subnet과 수동 EIP 없음 |
+| Ideation | 최초 계획과 후속 Unit 5~8 범위 승인 |
+| Inception | 최초 계획과 후속 Unit 5~8 요구사항 승인 |
+| Construction | Unit 1~8 구현과 Review 완료. dev Task Definition과 Service는 CI/CD 소유로 변경 |
+| 로컬 검증 | 최신 Unit 8 fmt, validate, dev mock 4개와 전체 Plan 점검 2개 통과. 기존 SPA 검증은 Unit 8에서 재실행하지 않음 |
+| 실제 AWS Plan | Unit 8 변경 후 `sbh-platform`, 서울, S3 Backend에서 46 add / 0 change / 0 destroy. Task Definition과 Service 없음 |
 | Apply와 배포 | 사용자 지시로 수행하지 않음 |
-| 커밋과 푸시 | 기존 구현 커밋 `c1a36ed` 확인. 후속 Unit 5와 6 변경은 `main`에 커밋하고 원격 SHA 확인 |
+| 커밋과 푸시 | 기존 구현과 후속 Unit 5, 6은 원격 반영 확인. Unit 7과 8은 로컬 변경이며 커밋과 푸시 미수행 |
 
 초기 사용자의 `PLEASE IMPLEMENT THIS PLAN` 요청은 아래 최초 Ideation, Inception과 Unit 1~4의 Design 및 Implementation Plan 승인을 포함합니다. 후속 Unit 5와 6의 승인은 각 변경 기록에 따로 적었습니다. AWS 작업은 `sbh-platform` 프로필을 사용하며 실제 Terraform Plan까지만 수행합니다.
+
+아래 1~4절은 최초 구현 당시 기록입니다. 앱 Secrets Manager 구성에 관한 당시 설계와 검증은 후속 Unit 7이, Terraform의 Task Definition과 Service 소유는 Unit 8이 대체했습니다. 현재 상태는 위 표와 Unit 8 기록을 따릅니다.
 
 ## 1. Ideation
 
@@ -247,3 +249,90 @@ Provider 스키마와 mock 테스트의 로컬 통신은 Sandbox에서 차단되
 | 2026-10-01 | `git diff --check` | PASS |
 | 2026-10-01 | `git commit -m "feat: switch dev to regional NAT"` | Unit 6 변경 커밋 완료 |
 | 2026-10-01 | `git push origin main`, `git ls-remote origin refs/heads/main` | 원격 `main` 푸시 및 SHA 일치 확인 |
+
+## 후속 변경: dev DATABASE_URL Parameter Store 연동
+
+### Ideation: 승인됨
+
+- 문제 정의: 현재 dev 백엔드는 DB 접속 정보를 일반 환경변수와 Secrets Manager의 앱 계정 Secret으로 나누어 받습니다. 백엔드가 요구하는 단일 `DATABASE_URL`을 ECS Task의 Secret으로 주입해야 합니다.
+- 사용자: 인프라, 백엔드와 배포 파이프라인 담당자입니다.
+- 성공 기준: 서비스 Task Definition이 `/sbh/platform/demo/backend/DATABASE_URL`의 SSM SecureString ARN을 `DATABASE_URL`로 참조하고, 실행 역할만 해당 Parameter를 읽을 수 있습니다. 값은 Terraform 변수, Plan과 State에 들어가지 않으며 mock Plan과 실제 AWS Plan에서 참조 및 권한을 검토합니다.
+- Scope: dev Root Module의 ECS Secret 연결과 실행 역할, 기존 앱 Secret 참조 정리, 결합 검증, dev README, AI-DLC와 Runbook입니다.
+- Non-goals: RDS 버전, 크기, DB 이름과 CloudFront 변경, 마이그레이션 Task 및 파이프라인 생성, 실제 Parameter 값 등록, Apply와 배포입니다.
+- 승인: 2026-10-01 사용자가 Parameter Store 연동 중심의 범위와 실제 값의 별도 등록 방식을 선택하고 위 Ideation의 Inception 진행을 승인했습니다. 지정 경로는 같은 날 메타데이터 조회에서 발견되지 않았습니다.
+
+### Inception: 승인됨
+
+- Functional Requirements: dev의 기존 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_SSLMODE`, `DB_USERNAME`, `DB_PASSWORD` 주입을 제거하고 ECS `secrets`에 `DATABASE_URL`의 전체 SSM ARN을 넣습니다. 실행 역할의 앱 Secret 읽기 권한을 해당 ARN에 한정된 `ssm:GetParameters`로 바꿉니다. RDS 관리형 관리자 Secret은 유지합니다. 쓰이지 않는 앱 Secrets Manager 메타데이터와 출력은 제거하고 비밀값을 담지 않는 Parameter ARN을 출력합니다.
+- Non-Functional Requirements: Parameter는 승인된 운영 경로에서 기본 `aws/ssm` 키의 SecureString으로 등록합니다. Terraform은 Parameter 값을 생성하거나 조회하지 않습니다. 고객 관리 KMS 키를 쓰기로 변경한다면 배포 전에 실행 역할의 `kms:Decrypt` 정책을 별도 검토해야 합니다. 기존 ECS 모듈 인터페이스와 DB, 네트워크, CloudFront 구성을 유지합니다.
+- Architecture: 운영 경로에서 SSM SecureString 등록 → ECS 실행 역할의 정확한 Parameter ARN 읽기 → Task Definition `secrets.valueFrom` → 컨테이너 `DATABASE_URL`입니다. 마이그레이션 Task도 동일한 실행 역할, Secret 참조와 App Subnet 및 ECS Security Group을 사용해야 하지만 해당 Task 생성은 별도 작업입니다.
+- Unit of Work: 단일 Unit 7에서 dev Terraform 연결, 결합 mock 검사, 문서와 실제 AWS Plan 검토를 함께 처리합니다.
+- Acceptance Criteria: 활성 서비스의 컨테이너 Secret은 정확히 `DATABASE_URL` 하나이고 전체 SSM ARN을 가리킵니다. 분리된 DB 환경변수와 앱 Secrets Manager 참조는 없습니다. 실행 정책은 해당 ARN에 `ssm:GetParameters`만 허용하며 Task Role에는 이 권한이 없습니다. 초기 이미지 Digest가 없을 때 ECS Service와 Task Definition은 생성하지 않습니다. fmt, validate, 결합 mock 및 전체 Plan 검사를 실제 실행하고 AWS Plan에서 생성, 변경, 삭제 및 비밀값 부재를 확인합니다. Parameter의 실재, 실제 주입과 DB 연결은 Apply 및 배포 전후 별도 확인 대상입니다.
+
+### Construction Unit 7: 승인된 Design과 Implementation Plan
+
+- Design: `env/dev`에 경로와 계정 및 리전으로 계산한 SSM ARN을 한 번 정의하고 ECS Secret, IAM 정책과 비밀값 없는 출력에서 재사용합니다. 재사용 ECS 모듈의 기존 `secrets` 입력을 사용합니다. 기존 앱 Secret 메타데이터는 구성에서 제거하고 실제 State에 존재해 삭제가 계획되면 Apply 전에 별도 검토합니다.
+- Implementation Plan: `env/dev/main.tf`, `iam.tf`, `outputs.tf`를 수정하고 `platform.tftest.hcl`과 `check-dev-test-plan.py`에서 정확한 ARN, 최소 권한과 이전 참조 부재를 확인합니다. dev README와 Runbook에는 실제 DB 엔드포인트 및 `db_name`을 사용해 URL을 등록하는 절차, 예약 문자 URL 인코딩, Parameter 메타데이터 사전 확인, Task 재시작 시점과 마이그레이션 Task의 선행 조건을 기록합니다. AI-DLC와 `docs/README.md`의 상태를 동기화합니다. 그 뒤 fmt, validate, 결합 mock, 전체 Plan 검사, 실제 AWS Plan과 diff를 Review합니다.
+- Approval: 2026-10-01 사용자가 이 Inception과 Unit 7의 Design 및 Implementation Plan을 승인했습니다. 실제 AWS Plan까지 승인했으며 Apply, 값 등록, 커밋과 푸시는 포함하지 않았습니다.
+- Implementation: dev Root Module에 비밀값 없는 SSM ARN을 정의해 ECS `DATABASE_URL` Secret, 실행 정책과 출력에 연결했습니다. 기존 앱 Secrets Manager 메타데이터, 분리된 DB 환경변수와 앱 Secret 읽기 권한을 제거했습니다. 재사용 ECS 모듈은 변경하지 않았습니다.
+- Test: `terraform fmt`와 허용된 환경의 `terraform validate`가 통과했습니다. dev 결합 mock 6개와 전체 Plan 점검 3개가 통과했고, 활성 구성에서 정확한 Secret ARN과 실행 역할의 `ssm:GetParameters`, 이전 앱 Secret 부재를 확인했습니다.
+- Review: 실제 AWS Plan은 46개 생성, 변경과 삭제 0개입니다. Backend State 파일은 존재하지만 `state list`의 관리 리소스는 비어 있습니다. Plan JSON에는 SSM ARN 출력만 있고 Parameter 값, 앱 Secret 리소스와 평문 DB URL은 없습니다. 초기 구성이라 ECS Task Definition과 Service가 없으며 실행 IAM 정책 본문도 ECR ARN이 미정이어서 실제 Plan에서는 확정되지 않습니다. 활성 Task 참조와 정책의 정확한 ARN은 mock Plan으로 확인했습니다.
+- Operation: Runbook에 앱 계정 생성 뒤 외부 SecureString 등록, 메타데이터 사전 확인, 별도 마이그레이션 Task의 선행 조건, 값 교체 후 Task 재시작을 기록했습니다. 2026-10-01 조회 시 Parameter는 아직 존재하지 않았습니다. Apply, 값 등록, 배포와 DB 접속 검증은 수행하지 않았습니다.
+- Git: Unit 7 변경은 로컬 작업 트리에 있으며 커밋과 푸시는 수행하지 않았습니다.
+
+### Unit 7 검증 기록
+
+| 날짜 | 명령 | 결과 |
+|---|---|---|
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 ssm describe-parameters`에서 지정 Name 메타데이터 조회 | 결과 빈 배열. 값은 조회하지 않음 |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 s3api head-object --bucket sbh-platform-prod-s3-tf --key sbh-platform/dev/terraform.tfstate` | Sandbox 네트워크 연결 실패. State 존재 여부는 이번 조회로 판정하지 않음 |
+| 2026-10-01 | 같은 `s3api head-object` 명령을 허용된 환경에서 재실행 | State 객체 존재 확인 |
+| 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev state list` | 관리 리소스 목록 빈 결과 |
+| 2026-10-01 | `aws --profile sbh-platform --region ap-northeast-2 ssm describe-parameters --parameter-filters Key=Name,Option=Equals,Values=/sbh/platform/demo/backend/DATABASE_URL --query 'Parameters[].[Name,Type,KeyId]' --output json` | 빈 배열. 비밀값은 조회하지 않음 |
+| 2026-10-01 | `terraform fmt -check -recursive env/dev`, Python AST 구문 검사, `git diff --check` | PASS |
+| 2026-10-01 | `terraform -chdir=env/dev validate -no-color` | Sandbox에서 Provider 시작 실패 후 허용된 환경 재실행 PASS |
+| 2026-10-01 | `.local/terraform-1.17.0-beta2/terraform -chdir=env/dev test -test-directory=tests-terraform-1.17 -no-color -verbose -json > .local/dev-parameter-store-tests.jsonl` | Sandbox에서 Provider 시작 실패 후 허용된 환경 재실행, mock 6 PASS / 0 FAIL |
+| 2026-10-01 | `python3 scripts/check-dev-test-plan.py .local/dev-parameter-store-tests.jsonl` | 초기 구성과 활성 구성 전체 Plan 검사 3 PASS |
+| 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-parameter-store.tfplan > .local/dev-parameter-store-plan.log` | 종료 코드 2, 46 add / 0 change / 0 destroy |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-parameter-store.tfplan > .local/dev-parameter-store.tfplan.json` 및 Python 인라인 검사 | Sandbox에서 Provider 시작 실패 후 허용된 환경 재실행. 생성 46개, 삭제 없음, SSM ARN 출력, 값과 앱 Secret 리소스 부재 확인 |
+
+## 후속 변경: dev ECS 배포 소유 경계
+
+### Ideation: 승인됨
+
+- 문제 정의: 현재 dev는 이미지 Digest를 지정하면 Terraform이 Task Definition과 Service를 함께 소유합니다. CI/CD가 새 Task Definition revision을 Service에 배포한 뒤 Terraform Apply를 실행하면 Service가 Terraform의 이전 revision으로 돌아갈 수 있습니다.
+- 사용자: 인프라 운영자, 백엔드와 CI/CD 담당자입니다.
+- 성공 기준: dev Terraform State와 Plan이 Task Definition 및 Service를 관리하지 않고, CI/CD가 두 리소스를 생성하고 갱신할 수 있도록 인프라 식별자와 런타임 계약을 제공합니다. 이후 인프라 Apply가 CI/CD의 Task Definition revision을 되돌리지 않습니다.
+- Scope: dev Root Module의 ECS 호출과 입력 및 출력, 결합 검증, dev README, AI-DLC, 프로젝트 README와 Runbook의 배포 소유 경계입니다. Unit 7의 Parameter Store ARN과 실행 역할 권한은 유지합니다.
+- Non-goals: CI/CD 워크플로와 배포용 IAM 주체 생성, 실제 Task Definition 및 Service 등록, Parameter 값 등록, Terraform Apply, 배포, 커밋과 푸시입니다.
+- 승인: 2026-10-01 사용자가 CI/CD가 Task Definition과 Service를 소유하는 방향으로 Ideation을 승인했습니다. 현재 저장소에는 배포 워크플로가 없고, 이전 확인 시 dev Terraform State의 관리 리소스 목록은 비어 있었습니다. 새 Plan에서 삭제와 교체 여부를 다시 확인합니다.
+
+### Inception: 승인됨
+
+- Functional Requirements: dev `module.ecs`는 Cluster와 로그 그룹만 생성합니다. `backend_image_digest` 입력과 dev의 Terraform 관리 Task Definition 및 Service 활성화 경로를 제거합니다. `backend` 출력은 ECR 저장소, Cluster, 로그 그룹, 실행 및 Task Role, ECS Security Group, ALB Target Group, 컨테이너 이름과 포트를 CI/CD에 제공합니다. `network.app_subnet_ids`와 `database.database_url_parameter_arn`도 CI/CD 입력 계약에 포함합니다. Service와 Task Definition ARN 출력은 제거합니다.
+- Non-Functional Requirements: 기존 범용 ECS 모듈 인터페이스는 유지하고 dev에서 `service`를 전달하지 않습니다. 비밀값은 Terraform에 입력하거나 조회하지 않습니다. Terraform이 관리하는 Cluster, ALB, 보안 그룹과 역할의 변경은 서비스에 영향을 줄 수 있으므로 계속 Plan을 검토합니다.
+- Architecture: Terraform → ECR, ECS Cluster, 로그 그룹, IAM Role과 SSM 읽기 권한, App Subnet 및 Security Group, ALB Target Group을 제공합니다. CI/CD → 이미지 Digest로 Task Definition revision 등록, 동일 네트워크에서 마이그레이션 Task 실행, ECS Service 생성 또는 새 revision으로 갱신을 수행합니다. 컨테이너는 `app`, 기본 포트 8000, Fargate Linux X86_64, CPU 512, 메모리 1024 MiB, `DATABASE_URL` SSM Secret 참조를 사용합니다.
+- Unit of Work: 단일 Unit 8에서 dev의 소유 경계, 결합 검증, 문서와 실제 AWS Plan 검토를 처리합니다.
+- Acceptance Criteria: 기본 dev mock Plan과 실제 AWS Plan에 `aws_ecs_task_definition`, `aws_ecs_service`가 없습니다. dev에는 이미지 Digest 입력이 없고 출력에는 CI/CD가 필요한 ARN, ID, 포트와 이름이 있습니다. Parameter ARN 및 실행 역할의 `ssm:GetParameters` 권한은 유지됩니다. 기존 Network, RDS, ALB와 CloudFront 구성을 유지하고 fmt, validate, 결합 mock 및 Plan 검사를 실행합니다. 실제 AWS Plan에 의도하지 않은 삭제나 교체가 없는지 확인합니다.
+
+### Construction Unit 8: 승인된 Design과 Implementation Plan
+
+- Design: 범용 `modules/ecs`의 선택적 `service` 인터페이스는 그대로 두고 dev 호출에서 서비스 입력을 제거합니다. Cluster와 로그 그룹은 다른 인프라와 직접 의존하지 않으므로 dev ECS 모듈의 `depends_on`도 제거합니다. CI/CD 인수인계에 필요한 비밀값 없는 출력만 추가합니다.
+- Implementation Plan: `env/dev/main.tf`에서 `service`와 관련 의존성을, `variables.tf`에서 이미지 Digest 입력을 제거합니다. `outputs.tf`의 배포 리소스 ARN을 CI/CD 인프라 출력으로 교체합니다. dev 결합 mock과 `check-dev-test-plan.py`를 서비스 생성 테스트 대신 인프라 및 출력 계약 검사로 바꾸고 포트 재정의 검증을 유지합니다. dev README, AI-DLC, 프로젝트 README와 Runbook에 CI/CD의 Task Definition 등록, 마이그레이션, Service 생성 및 후속 revision 배포 순서를 기록합니다. fmt, validate, 결합 mock, 전체 Plan 검사와 실제 AWS Plan을 실행하고 diff 및 삭제 여부를 Review합니다.
+- Approval: 2026-10-01 사용자가 Inception과 Unit 8의 Design 및 Implementation Plan을 승인했습니다. mock 검증과 실제 AWS Plan까지 포함하며 Apply, CI/CD 워크플로 구현, 커밋과 푸시는 포함하지 않았습니다.
+- Implementation: dev ECS 모듈 호출에서 `service`와 불필요한 전체 모듈 의존성을 제거하고 이미지 Digest 입력을 삭제했습니다. CI/CD에 필요한 Cluster, ECR, 로그 그룹, Role, ECS Security Group, ALB Target Group, 컨테이너 이름과 포트를 출력합니다. 범용 ECS 모듈은 변경하지 않았고 Unit 7의 SSM 권한 및 ARN은 유지했습니다.
+- Test: `terraform fmt`와 허용된 환경의 `terraform validate`, dev mock 4개와 전체 Plan 점검 2개가 통과했습니다. 기본 포트 8000과 재정의 포트 9090에서 ALB 및 보안 그룹 연결, CI/CD 출력 계약과 Task Definition 및 Service 부재를 확인했습니다.
+- Review: 실제 AWS Plan은 46개 생성, 변경과 삭제 0개입니다. Plan JSON에 Terraform 관리 Task Definition, Service, 앱 Secret과 SSM 값 리소스가 없고 이미지 Digest 입력도 없습니다. CI/CD 인수인계 출력과 비밀값 없는 SSM ARN을 확인했습니다. Parameter 값의 존재, CI/CD 동작과 실제 서비스 배포는 검증하지 않았습니다.
+- Operation: Runbook에 Terraform 인프라 Apply 이후 CI/CD의 Task Definition 등록, 마이그레이션 Task, Service 생성 및 후속 revision 갱신 순서와 AZ 재분산 및 배포 Circuit Breaker 설정을 기록했습니다. Apply와 배포는 수행하지 않았습니다.
+- Git: Unit 7과 8 변경은 로컬 작업 트리에 있으며 커밋과 푸시는 수행하지 않았습니다.
+
+### Unit 8 검증 기록
+
+| 날짜 | 명령 | 결과 |
+|---|---|---|
+| 2026-10-01 | `terraform fmt -check -recursive env/dev`, Python AST 구문 검사, `git diff --check` | PASS |
+| 2026-10-01 | `terraform -chdir=env/dev validate -no-color` | 허용된 환경에서 PASS |
+| 2026-10-01 | `.local/terraform-1.17.0-beta2/terraform -chdir=env/dev test -test-directory=tests-terraform-1.17 -no-color -verbose -json > .local/dev-cicd-ownership-tests.jsonl` | mock 4 PASS / 0 FAIL |
+| 2026-10-01 | `python3 scripts/check-dev-test-plan.py .local/dev-cicd-ownership-tests.jsonl` | 기본 포트와 재정의 포트 전체 Plan 검사 2 PASS |
+| 2026-10-01 | `AWS_PROFILE=sbh-platform terraform -chdir=env/dev plan -input=false -no-color -detailed-exitcode -out=../../.local/dev-cicd-ownership.tfplan > .local/dev-cicd-ownership-plan.log` | 종료 코드 2, 46 add / 0 change / 0 destroy |
+| 2026-10-01 | `terraform -chdir=env/dev show -json ../../.local/dev-cicd-ownership.tfplan > .local/dev-cicd-ownership.tfplan.json` 후 Python 인라인 검사 | 허용된 환경에서 JSON 변환, Terraform 관리 Task Definition과 Service 부재, CI/CD 출력, 삭제 및 평문 DB URL 부재 확인 |

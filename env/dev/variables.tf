@@ -31,17 +31,6 @@ variable "health_check_path" {
   }
 }
 
-variable "backend_image_digest" {
-  description = "같은 ECR 저장소의 배포할 이미지 Digest입니다. null이면 ECS 서비스는 생성하지 않습니다."
-  type        = string
-  default     = null
-
-  validation {
-    condition     = var.backend_image_digest == null ? true : can(regex("^sha256:[0-9a-f]{64}$", var.backend_image_digest))
-    error_message = "backend_image_digest는 sha256: 뒤에 소문자 16진수 64자를 지정해야 합니다."
-  }
-}
-
 variable "postgres_engine_version" {
   description = "서울 리전에서 지원하는 PostgreSQL 엔진 버전입니다."
   type        = string

@@ -2,7 +2,7 @@
 
 서울 리전의 두 AZ에 CloudFront + S3, Internal ALB + Fargate, PostgreSQL Multi-AZ 인프라를 구성해요. AWS Provider와 Backend는 `sbh-platform` 프로필을 사용해요.
 
-기본 구성은 인프라 준비 단계예요. `backend_image_digest = null`이면 ECS Cluster와 30일 로그 그룹만 만들고 Task Definition과 Service는 생성하지 않아요. 앱 이미지와 DB 계정/Secret이 준비된 후 Digest를 지정하면 Task 2개를 활성화할 수 있어요.
+이 Root Module은 ECS Cluster, 로그 그룹과 네트워크 및 접근 기반을 만들어요. Task Definition과 Service는 CI/CD가 생성하고 갱신해요. Terraform에서 이미지 Digest를 입력받거나 서비스 revision을 관리하지 않아요.
 
 ## 구조
 
@@ -11,7 +11,7 @@ flowchart LR
   user[인터넷 사용자] --> cf[CloudFront HTTPS]
   cf -->|OAC| s3[비공개 S3]
   cf -->|/api, /api/* VPC Origin| alb[Internal ALB HTTP 80]
-  alb -->|TCP 8000| ecs[Fargate App Private, Task 2개]
+  alb -->|TCP 8000| ecs[Fargate App Private, CI/CD 배포]
   ecs -->|TCP 5432| rds[PostgreSQL DB Private, Multi-AZ]
   ecs -->|HTTPS| nat[Regional NAT Gateway]
 ```
@@ -23,16 +23,17 @@ flowchart LR
 
 Public Subnet과 Public Route Table은 만들지 않아요. Regional NAT는 VPC에 하나를 만들고 두 App Subnet이 같은 NAT ID를 사용해요. NAT가 인터넷으로 송신하고 CloudFront VPC Origin을 만들 수 있도록 Internet Gateway는 VPC에 연결해요. App, DB와 Internal ALB에는 직접 인터넷 수신 경로가 없어요. Regional NAT의 송신 IP는 AWS가 관리하며 요금은 활성 AZ별로 발생해요. [AWS Regional NAT](https://docs.aws.amazon.com/vpc/latest/userguide/nat-gateways-regional.html), [CloudFront VPC Origin](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/private-content-vpc-origins.html), [NAT 요금](https://aws.amazon.com/vpc/pricing/)
 
-DB는 PostgreSQL 17.11, db.t4g.small, gp3 20 GiB예요. 자동 장애 전환용 Primary와 Standby를 구성하고 읽기 복제본은 만들지 않아요. 암호화, 7일 백업, 삭제 보호와 최종 스냅샷을 사용해요.
+DB는 PostgreSQL 17.11, db.t4g.small, gp3 20 GiB예요. 자동 장애 전환용 Primary와 Standby를 구성하고 읽기 복제본은 만들지 않아요. 암호화, 7일 백업, 삭제 보호와 최종 스냅샷을 사용해요. 백엔드는 `DATABASE_URL` 환경변수 하나로 접속하며 Task Definition의 Secret 참조로 주입해요.
+
+CI/CD는 이 인프라가 준비된 후 이미지 Digest로 Fargate Task Definition revision을 등록하고, 필요한 마이그레이션을 실행한 뒤 ECS Service를 생성하거나 새 revision으로 갱신해요. 서비스가 아직 없으면 ALB Target이 비어 있어 `/api`가 503을 반환할 수 있어요. [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)에 배포 입력 계약을 정리했어요.
 
 ## 입력 속성
 
 | 속성 | 타입 | 기본값 | 역할 |
 |---|---|---|---|
 | `vpc_cidr` | `string` | `"10.20.0.0/16"` | 네트워크 주소로 정렬된 IPv4 /16 CIDR이에요. |
-| `container_port` | `number` | `8000` | ECS, ALB Target Group과 Security Group의 앱 포트예요. |
+| `container_port` | `number` | `8000` | ALB Target Group, Security Group과 CI/CD Task Definition이 맞춰야 할 앱 포트예요. |
 | `health_check_path` | `string` | `"/api/health"` | ALB가 HTTP 200을 확인할 경로예요. |
-| `backend_image_digest` | `string` | `null` | 동일 ECR 저장소의 `sha256:...` 이미지 Digest예요. 지정하면 서비스를 활성화해요. |
 | `postgres_engine_version` | `string` | `"17.11"` | PostgreSQL 버전이에요. 변경 시 리전 지원을 다시 확인하세요. |
 | `postgres_instance_class` | `string` | `"db.t4g.small"` | DB 인스턴스 클래스예요. |
 | `db_name` | `string` | `"sbhapp"` | 초기 데이터베이스 이름이에요. |
@@ -52,8 +53,8 @@ CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가
 |---|---|
 | `network` | VPC, App/DB Private Subnet과 Regional NAT 식별 정보예요. |
 | `frontend` | S3 버킷, CloudFront Distribution ID와 HTTPS 주소예요. |
-| `backend` | ECR, ECS, 로그 그룹, ALB와 IAM Role 식별 정보예요. 초기 Service와 Task Definition은 `null`이에요. |
-| `database` | DB 식별자, 주소, 포트, 이름과 관리자/앱 Secret ARN이에요. Secret 값은 출력하지 않아요. |
+| `backend` | CI/CD가 배포에 사용할 ECR, ECS Cluster, 로그 그룹, ALB, 보안 그룹과 IAM Role 식별 정보예요. |
+| `database` | DB 식별자, 주소, 포트, 이름, 관리자 Secret ARN과 `DATABASE_URL` Parameter ARN이에요. 비밀값은 출력하지 않아요. |
 
 | 출력 객체 | 내부 속성 | 역할 |
 |---|---|---|
@@ -68,20 +69,27 @@ CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가
 | `backend` | `ecr_repository_url` | 이미지 저장소 주소예요. |
 | `backend` | `cluster_name` | ECS Cluster 이름이에요. |
 | `backend` | `cluster_arn` | ECS Cluster ARN이에요. |
-| `backend` | `service_name` | 선택적 Service 이름이에요. |
-| `backend` | `service_arn` | 선택적 Service ARN이에요. |
-| `backend` | `task_definition_arn` | 선택적 Task Definition ARN이에요. |
 | `backend` | `log_group_name` | 로그 그룹 이름이에요. |
 | `backend` | `alb_arn` | Internal ALB ARN이에요. |
 | `backend` | `alb_dns_name` | Internal ALB DNS 이름이에요. |
-| `backend` | `execution_role_arn` | 이미지, 로그, 앱 Secret 주입 Role이에요. |
+| `backend` | `target_group_arn` | CI/CD가 ECS Service에 연결할 IP Target Group ARN이에요. |
+| `backend` | `ecs_security_group_id` | CI/CD가 Fargate Task에 붙일 Security Group ID예요. |
+| `backend` | `execution_role_arn` | 이미지, 로그와 `DATABASE_URL` 주입 Role이에요. |
 | `backend` | `task_role_arn` | 앱 AWS API Role이에요. 현재 부여한 권한은 없어요. |
+| `backend` | `container_name` | Target Group에 연결할 컨테이너 이름 `app`이에요. |
+| `backend` | `container_port` | Target Group과 일치해야 할 컨테이너 포트예요. |
 | `database` | `identifier` | DB 식별자예요. |
 | `database` | `address` | Primary 접속 DNS예요. |
 | `database` | `port` | TCP 5432예요. |
 | `database` | `name` | DB 이름이에요. |
 | `database` | `master_secret_arn` | RDS 관리형 관리자 Secret ARN이에요. |
-| `database` | `app_secret_arn` | 앱 계정용 Secret ARN이에요. 값은 후속 작업에서 등록해요. |
+| `database` | `database_url_parameter_arn` | 앱 접속 URL을 담을 SSM Parameter ARN이에요. 값은 승인된 운영 경로에서 별도로 등록해요. |
+
+## DATABASE_URL 준비
+
+Parameter 이름은 `/sbh/platform/demo/backend/DATABASE_URL`이고 유형은 SecureString이에요. 실제 값은 Terraform에서 생성하거나 읽지 않아요. 첫 서비스 활성화 전에 승인된 운영 경로에서 기본 `aws/ssm` 키로 등록하고, 현재 DB 주소와 `db_name`을 사용해 `postgresql+psycopg://<앱 사용자>:<URL 인코딩된 암호>@<DB 주소>:5432/<DB 이름>?sslmode=require` 형식으로 구성해요. 비밀번호의 예약 문자는 URL 인코딩해야 해요. 고객 관리 KMS 키를 쓰면 ECS 실행 역할에 해당 키의 `kms:Decrypt` 권한이 추가로 필요해요.
+
+현재 기본 DB 이름은 `sbhapp`이에요. 앱 사용자는 RDS 관리자 계정과 별도로 만들어야 해요. Parameter 값, 비밀번호와 DB 접속 URL을 tfvars, Terraform 출력, Plan이나 명령행 인자에 넣지 마세요. 등록과 마이그레이션 Task의 선행 조건은 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)을 따라 확인해요.
 
 ## Backend와 실제 Plan
 
@@ -113,6 +121,6 @@ python3 scripts/check-dev-test-plan.py .local/dev-tests.jsonl
 node --test modules/cloudfront/tests/spa.test.cjs
 ```
 
-AWS와 Random Provider를 mock으로 대체해 자격 증명 없이 테스트해요. 기존 RDS 모듈에는 두 Provider의 ephemeral 선언이 있어 1.16.4에서 결합 mock 테스트가 실행되지 않아요. 기존 RDS 테스트와 같은 방식으로 `tests-terraform-1.17`에 테스트를 분리하고, [공식 1.17.0-beta2 테스트 CLI](https://releases.hashicorp.com/terraform/1.17.0-beta2/)를 Git 제외 폴더에 내려받아 SHA-256을 확인한 뒤 사용했어요. 모듈과 실제 Plan은 1.11 이상에서 사용해요. Regional NAT 변경 후 안정 버전 1.15.4로 실행한 실제 Plan은 47개 생성, 변경과 삭제 0개예요. 이전 Zonal NAT 구성의 56개 생성 Plan과 구분해요. mock 테스트는 AWS 리소스나 Backend State를 만들지 않아요.
+AWS와 Random Provider를 mock으로 대체해 자격 증명 없이 테스트해요. 기존 RDS 모듈에는 두 Provider의 ephemeral 선언이 있어 1.16.4에서 결합 mock 테스트가 실행되지 않아요. 기존 RDS 테스트와 같은 방식으로 `tests-terraform-1.17`에 테스트를 분리하고, [공식 1.17.0-beta2 테스트 CLI](https://releases.hashicorp.com/terraform/1.17.0-beta2/)를 Git 제외 폴더에 내려받아 SHA-256을 확인한 뒤 사용했어요. 모듈과 실제 Plan은 1.11 이상에서 사용해요. CI/CD 소유 경계 변경 후 안정 버전 1.15.4로 실행한 실제 Plan은 46개 생성, 변경과 삭제 0개예요. Task Definition과 Service는 Plan에 없어요. mock 테스트는 AWS 리소스나 Backend State를 만들지 않아요.
 
-초기 구성과 Task 활성화 구성의 전체 Plan을 검사해요. Private Subnet 4개, Regional NAT 1개, Public Subnet과 수동 EIP 부재, DB 경로 격리, RDS Multi-AZ, Role/Secret 분리와 서비스 Task 2개를 확인해요. 배포와 운영 절차는 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)에 있어요.
+기본 포트와 재정의 포트의 인프라 Plan을 검사해요. Private Subnet 4개, Regional NAT 1개, Public Subnet과 수동 EIP 부재, DB 경로 격리, RDS Multi-AZ, 실행 역할의 SSM 최소 권한, CI/CD 인수인계 출력과 Terraform 관리 Task Definition 및 Service 부재를 확인해요. Plan은 Parameter 값의 존재나 실제 DB 연결을 증명하지 않아요. 배포와 운영 절차는 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)에 있어요.

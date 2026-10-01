@@ -10,8 +10,9 @@ locals {
     ManagedBy   = "terraform"
     Owner       = "정호원"
   })
-  app_subnet_ids = [module.network.private_subnet_ids["app_a"], module.network.private_subnet_ids["app_c"]]
-  db_subnet_ids  = [module.network.private_subnet_ids["db_a"], module.network.private_subnet_ids["db_c"]]
+  app_subnet_ids             = [module.network.private_subnet_ids["app_a"], module.network.private_subnet_ids["app_c"]]
+  db_subnet_ids              = [module.network.private_subnet_ids["db_a"], module.network.private_subnet_ids["db_c"]]
+  database_url_parameter_arn = "arn:${data.aws_partition.current.partition}:ssm:ap-northeast-2:${data.aws_caller_identity.current.account_id}:parameter/sbh/platform/demo/backend/DATABASE_URL"
 }
 
 module "network" {
@@ -120,13 +121,6 @@ module "database" {
   tags                    = local.tags
 }
 
-resource "aws_secretsmanager_secret" "app_database" {
-  name                    = "${local.name}-secret-db-app"
-  description             = "Application PostgreSQL credentials: username and password JSON keys, provisioned outside Terraform"
-  recovery_window_in_days = 30
-  tags                    = merge(local.tags, { Name = "${local.name}-secret-db-app" })
-}
-
 module "ecs" {
   source = "../../modules/ecs"
 
@@ -134,38 +128,5 @@ module "ecs" {
   log_group_name     = "${local.name}-log-api"
   log_region         = "ap-northeast-2"
   log_retention_days = 30
-  service = var.backend_image_digest == null ? null : {
-    image              = "${module.ecr.repository_url}@${var.backend_image_digest}"
-    container_port     = var.container_port
-    cpu                = 512
-    memory             = 1024
-    desired_count      = 2
-    subnet_ids         = local.app_subnet_ids
-    security_group_ids = [module.ecs_security_group.security_group_id]
-    target_group_arn   = module.alb.target_group_arns["api"]
-    execution_role_arn = module.execution_role.role_arn
-    task_role_arn      = module.task_role.role_arn
-    environment = {
-      DB_HOST    = module.database.writer_address
-      DB_PORT    = tostring(module.database.port)
-      DB_NAME    = var.db_name
-      DB_SSLMODE = "verify-full"
-    }
-    secrets = {
-      DB_USERNAME = "${aws_secretsmanager_secret.app_database.arn}:username::"
-      DB_PASSWORD = "${aws_secretsmanager_secret.app_database.arn}:password::"
-    }
-  }
-  tags = local.tags
-
-  depends_on = [
-    module.alb,
-    module.execution_role,
-    aws_vpc_security_group_ingress_rule.alb_to_ecs,
-    aws_vpc_security_group_ingress_rule.ecs_to_db,
-    aws_vpc_security_group_egress_rule.alb_to_ecs,
-    aws_vpc_security_group_egress_rule.ecs_to_db,
-    aws_vpc_security_group_egress_rule.ecs_https,
-    module.network,
-  ]
+  tags               = local.tags
 }

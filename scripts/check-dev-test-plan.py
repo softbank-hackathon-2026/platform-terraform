@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Check child-module resources in the full dev mock plans."""
+"""Check dev infrastructure and CI/CD handoff in mock plans."""
 
 import json
 import re
@@ -12,7 +12,7 @@ def require(condition, message):
         raise ValueError(message)
 
 
-def check_plan(plan, active, port):
+def check_plan(plan, port, health_path):
     resources = {
         r["address"]: r for r in plan["resource_changes"] if r["mode"] == "managed"
     }
@@ -29,8 +29,8 @@ def check_plan(plan, active, port):
         "aws_eip", "aws_lb", "aws_lb_target_group", "aws_lb_listener", "aws_security_group",
         "aws_vpc_security_group_ingress_rule", "aws_vpc_security_group_egress_rule",
         "aws_db_subnet_group", "aws_db_instance", "aws_ecs_cluster", "aws_cloudwatch_log_group",
-        "aws_ecs_task_definition", "aws_ecs_service", "aws_iam_role", "aws_iam_policy",
-        "aws_ecr_repository", "aws_secretsmanager_secret", "aws_s3_bucket",
+        "aws_iam_role", "aws_iam_policy",
+        "aws_ecr_repository", "aws_s3_bucket",
         "aws_cloudfront_distribution", "aws_cloudfront_vpc_origin", "aws_cloudfront_function",
     }
     required_tags = {
@@ -40,8 +40,8 @@ def check_plan(plan, active, port):
     native_name_fields = {
         "aws_lb": "name", "aws_lb_target_group": "name", "aws_security_group": "name",
         "aws_iam_role": "name", "aws_iam_policy": "name", "aws_ecr_repository": "name",
-        "aws_ecs_cluster": "name", "aws_ecs_service": "name", "aws_cloudwatch_log_group": "name",
-        "aws_cloudfront_function": "name", "aws_secretsmanager_secret": "name",
+        "aws_ecs_cluster": "name", "aws_cloudwatch_log_group": "name",
+        "aws_cloudfront_function": "name",
         "aws_db_instance": "identifier", "aws_db_subnet_group": "name", "aws_s3_bucket": "bucket",
     }
     for resource in resources.values():
@@ -89,7 +89,7 @@ def check_plan(plan, active, port):
         require(db.get(key) == value, f"RDS {key} mismatch")
     require(db.get("password") is None and db.get("password_wo") is None, "No DB password may be stored")
     require(attrs("module.database.aws_db_subnet_group.this")["subnet_ids"] == ["subnet-db-a", "subnet-db-c"], "RDS must use DB subnets only")
-    require(len(of_type("aws_secretsmanager_secret")) == 1 and not of_type("aws_secretsmanager_secret_version"), "Only app secret metadata is managed")
+    require(not of_type("aws_secretsmanager_secret") and not of_type("aws_secretsmanager_secret_version") and not of_type("aws_ssm_parameter"), "Terraform must not manage app credential values or metadata")
 
     ingress = of_type("aws_vpc_security_group_ingress_rule")
     egress = of_type("aws_vpc_security_group_egress_rule")
@@ -98,8 +98,9 @@ def check_plan(plan, active, port):
     require(all(not r["change"]["after"].get("cidr_ipv4") for r in ingress), "Ingress must use prefix list or security group references")
     policy = json.loads(attrs("module.execution_policy.aws_iam_policy.this")["policy"])
     statements = {s["Sid"]: s for s in policy["Statement"]}
-    app_secret = attrs("aws_secretsmanager_secret.app_database")["arn"]
-    require(statements["ReadApplicationDatabaseSecret"]["Resource"] == app_secret, "Execution role must use app secret only")
+    parameter_arn = "arn:aws:ssm:ap-northeast-2:123456789012:parameter/sbh/platform/demo/backend/DATABASE_URL"
+    require(set(statements) == {"EcrLogin", "PullBackendImage", "WriteTaskLogs", "ReadApplicationDatabaseUrl"}, "Unexpected execution role permissions")
+    require(statements["ReadApplicationDatabaseUrl"]["Action"] == ["ssm:GetParameters"] and statements["ReadApplicationDatabaseUrl"]["Resource"] == parameter_arn, "Execution role must read only the DATABASE_URL parameter")
     require(statements["PullBackendImage"]["Resource"] == attrs("module.ecr.aws_ecr_repository.this")["arn"], "Image access must be scoped to backend ECR")
     require(statements["WriteTaskLogs"]["Resource"].endswith("log-group:sbh-platform-dev-log-api:log-stream:*"), "Logs must be scoped to backend streams")
     require(not any(a.startswith("module.task_role.aws_iam_role_policy_attachment") for a in resources), "Task role must not inherit execution permissions")
@@ -111,7 +112,7 @@ def check_plan(plan, active, port):
     target = attrs('module.alb.aws_lb_target_group.this["api"]')
     require(target["name"] == "sbh-platform-dev-tg-api" and len(target["name"]) <= 32, "Target group naming mismatch")
     require(target["target_type"] == "ip" and target["port"] == port, "Fargate requires the correct IP target group")
-    require(target["health_check"][0]["path"] == ("/api/ready" if active else "/api/health"), "Health path must propagate")
+    require(target["health_check"][0]["path"] == health_path, "Health path must propagate")
     require(attrs('module.alb.aws_lb_listener.forward["http"]')["port"] == 80, "ALB listener must be HTTP 80")
 
     distribution = attrs("module.cloudfront.aws_cloudfront_distribution.this")
@@ -131,36 +132,27 @@ def check_plan(plan, active, port):
     bucket = attrs("module.frontend.aws_s3_bucket.this")["bucket"]
     require(bucket == "sbh-platform-dev-s3-web-123456789012" and len(bucket) <= 63, "S3 bucket naming mismatch")
 
-    require(len(of_type("aws_ecs_service")) == int(active), "Service bootstrap mismatch")
-    require(len(of_type("aws_ecs_task_definition")) == int(active), "Task bootstrap mismatch")
-    if active:
-        service = attrs('module.ecs.aws_ecs_service.this["this"]')
-        task = attrs('module.ecs.aws_ecs_task_definition.this["this"]')
-        require(service["desired_count"] == 2 and service["launch_type"] == "FARGATE", "Expected two On-Demand Fargate tasks")
-        require(service["availability_zone_rebalancing"] == "ENABLED", "AZ rebalancing must be enabled")
-        require(service["network_configuration"][0]["assign_public_ip"] is False, "Tasks must not have public IPs")
-        require(service["network_configuration"][0]["subnets"] == ["subnet-app-a", "subnet-app-c"], "Tasks must use app subnets")
-        require(task["cpu"] == "512" and task["memory"] == "1024", "Fargate size mismatch")
-        require(task["runtime_platform"][0] == {"cpu_architecture": "X86_64", "operating_system_family": "LINUX"}, "Runtime platform mismatch")
-        require(task["execution_role_arn"] != task["task_role_arn"], "Execution and task roles must be separate")
-        container = json.loads(task["container_definitions"])[0]
-        require(container["image"].endswith("@sha256:" + "a" * 64), "Image must be pinned to digest")
-        require(container["portMappings"][0]["containerPort"] == port, "Container port must propagate")
-        require(container["logConfiguration"]["options"]["awslogs-region"] == "ap-northeast-2", "Task logs must use Seoul")
-        secrets = {s["name"]: s["valueFrom"] for s in container["secrets"]}
-        require(secrets == {"DB_USERNAME": app_secret + ":username::", "DB_PASSWORD": app_secret + ":password::"}, "Tasks must use app secret JSON keys")
-        require(all(e["name"] != "DB_PASSWORD" for e in container["environment"]), "Password must not be a plain environment value")
+    require(not of_type("aws_ecs_service") and not of_type("aws_ecs_task_definition"), "CI/CD must own Task Definition and Service")
+    backend = plan["output_changes"]["backend"]["after"]
+    required = {"ecr_repository_url", "cluster_name", "cluster_arn", "log_group_name", "target_group_arn", "ecs_security_group_id", "execution_role_arn", "task_role_arn", "container_name", "container_port"}
+    require(required <= backend.keys(), "Missing CI/CD handoff output")
+    require(not {"service_name", "service_arn", "task_definition_arn"} & backend.keys(), "Terraform must not output deployment-owned resources")
+    require(backend["cluster_name"] == "sbh-platform-dev-ecs-api" and backend["log_group_name"] == "sbh-platform-dev-log-api", "ECS handoff mismatch")
+    require(backend["target_group_arn"] == target["arn"] and backend["ecs_security_group_id"] == "sg-ecs", "ALB and network handoff mismatch")
+    require(backend["container_name"] == "app" and backend["container_port"] == port, "Container handoff mismatch")
+    require(plan["output_changes"]["network"]["after"]["app_subnet_ids"] == ["subnet-app-a", "subnet-app-c"], "App subnet handoff mismatch")
+    require(plan["output_changes"]["database"]["after"]["database_url_parameter_arn"] == parameter_arn, "SSM handoff mismatch")
 
 
 def main(path):
     events = [json.loads(line) for line in Path(path).read_text().splitlines() if line.strip()]
     summaries = [e["test_summary"] for e in events if e["type"] == "test_summary"]
-    require(summaries and summaries[-1]["status"] == "pass" and summaries[-1]["passed"] == 6, "Terraform tests must all pass first")
+    require(summaries and summaries[-1]["status"] == "pass" and summaries[-1]["passed"] == 4, "Terraform tests must all pass first")
     plans = {e["@testrun"]: e["test_plan"] for e in events if e["type"] == "test_plan"}
-    for name, active, port in [("infrastructure_only", False, 8000), ("activate_default_port", True, 8000), ("activate_two_tasks", True, 9090)]:
+    for name, port, health_path in [("infrastructure_only", 8000, "/api/health"), ("custom_port_handoff", 9090, "/api/ready")]:
         require(name in plans, f"Missing mock plan: {name}")
-        check_plan(plans[name], active, port)
-        print(f"PASS: {name} full plan network, security, database and service checks")
+        check_plan(plans[name], port, health_path)
+        print(f"PASS: {name} full plan infrastructure and CI/CD handoff checks")
 
 
 if __name__ == "__main__":

@@ -7,15 +7,30 @@
 ## 배포 순서
 
 1. `sbh-platform` 인증, 서울 리전과 기존 S3 Backend를 확인해요. State Key는 dev 전용으로 유지해요. `AWS_PROFILE=sbh-platform ./tf dev plan`에서 변경과 삭제, 활성 AZ별 비용이 발생하는 Regional NAT 1개, ALB, RDS Multi-AZ를 검토해요.
-2. 후속 Apply 승인 후 인프라 준비 구성을 적용해요. `backend_image_digest = null`이면 Task Definition과 Service는 없어요. ALB Target이 비어 있으므로 `/api`의 503은 이 단계의 예상 상태예요.
-3. VPC 내부에서 DB에 접속할 수 있는 별도 관리 경로를 준비해요. 현재 Terraform에는 DB 접근용 공개 포트, Bastion과 관리자 ECS Task가 없어요. RDS 관리자 Secret으로 접속해 `sbhapp` DB의 앱 전용 사용자를 만들고 필요한 스키마 권한만 부여해요. 관리자 계정을 앱에서 사용하지 않아요.
-4. 앱 Secret에 `username`, `password` JSON 키를 Secrets Manager의 승인된 운영 경로로 등록해요. Terraform에는 Secret 메타데이터만 있어요. Terraform 변수, 출력, 명령행 인자와 로그에 암호를 넣지 않아요. RDS 관리자 Secret과 앱 Secret은 별개예요.
-5. Linux X86_64 이미지를 빌드하고 해당 ECR에 업로드해요. 앱은 기본 포트 8000에서 `0.0.0.0`으로 수신하고 `/api/health`에 인증 없이 HTTP 200을 반환해야 해요. 환경변수 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`를 사용하고 `DB_SSLMODE=verify-full`에 맞춰 RDS CA 인증서를 이미지에 포함해요.
-6. 이미지 Digest를 로컬 tfvars에 설정하고 새 Plan을 검토해요. Task Definition과 Service가 추가되고 Task 2개, Public IP 비활성화, 두 App Subnet, AZ 재분산이 유지되는지 확인해요. 승인 후 활성화 Apply를 진행해요.
-7. 두 AZ의 정상 Task와 ALB Target을 확인한 후 프론트 빌드 결과를 S3에 업로드해요. API는 같은 CloudFront Origin의 `/api`를 사용해요. `/assets/*`와 `/static/*`에는 콘텐츠 해시가 있는 파일명을 사용하고 HTML은 캐싱하지 않아요.
-8. CloudFront HTTPS 주소에서 SPA 직접 접근, 인증 헤더, 쿠키, Query String, POST/PATCH/DELETE와 API 4xx/5xx 응답을 검증해요. ALB Host와 전송 구간은 내부 HTTP예요. 앱의 공개 URL과 신뢰할 프록시/HTTPS 인식 설정을 CloudFront에 맞춰 구성하고 로그인 Redirect와 Secure Cookie를 확인해요.
+2. 후속 Apply 승인 후 인프라 준비 구성을 적용해요. Terraform은 ECS Cluster와 로그 그룹을 만들지만 Task Definition과 Service는 만들지 않아요. CI/CD가 서비스를 배포하기 전에는 ALB Target이 비어 있으므로 `/api`의 503은 예상 상태예요.
+3. VPC 내부에서 DB에 접속할 수 있는 별도 관리 경로를 준비해요. 현재 Terraform에는 DB 접근용 공개 포트, Bastion과 관리자 ECS Task가 없어요. RDS 관리자 Secret으로 접속해 실제 `db_name`의 앱 전용 사용자를 만들고 필요한 스키마 권한만 부여해요. 관리자 계정을 앱에서 사용하지 않아요. 현재 기본 DB 이름은 `sbhapp`이에요.
+4. 승인된 운영 경로에서 `/sbh/platform/demo/backend/DATABASE_URL`을 SecureString으로 등록해요. 기본 `aws/ssm` 키를 사용하면 ECS 실행 역할에 추가 KMS 권한은 필요하지 않아요. 값은 실제 앱 사용자, URL 인코딩된 비밀번호, RDS Writer 주소와 DB 이름을 사용해 `postgresql+psycopg://<앱 사용자>:<URL 인코딩된 암호>@<DB 주소>:5432/<DB 이름>?sslmode=require` 형식으로 만들어요. 예약 문자 `@`, `:`, `/`, `?`, `#` 등은 비밀번호 안에서 URL 인코딩해야 해요. 값과 비밀번호를 Terraform 변수, 출력, 명령행 인자와 로그에 넣지 마세요. 고객 관리 KMS 키를 사용한다면 해당 키의 `kms:Decrypt` 권한을 실행 역할에 추가한 뒤 배포해요.
+5. 값 자체를 조회하지 않는 아래 명령으로 Parameter의 Name, Type과 KeyId를 확인해요. 현재 조회 결과에는 지정 Parameter가 없었으므로 첫 배포 전에 반드시 등록 여부를 다시 확인해야 해요. 이름과 Type이 맞아도 URL 내용과 DB 연결 성공은 별도로 검증해야 해요.
+
+   ```sh
+   aws --profile sbh-platform --region ap-northeast-2 ssm describe-parameters \
+     --parameter-filters "Key=Name,Option=Equals,Values=/sbh/platform/demo/backend/DATABASE_URL" \
+     --query 'Parameters[].[Name,Type,KeyId]' --output table
+   ```
+
+6. Linux X86_64 이미지를 빌드하고 해당 ECR에 업로드해요. 앱은 기본 포트 8000에서 `0.0.0.0`으로 수신하고 `/api/health`에 인증 없이 HTTP 200을 반환해야 해요. DB 접속에는 ECS가 Secret으로 주입한 `DATABASE_URL`을 사용해요. 기존 `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD`, `DB_SSLMODE`는 더는 전달하지 않아요.
+7. CI/CD가 고정된 이미지 Digest로 Fargate Task Definition revision을 등록해요. 컨테이너 이름과 포트, 실행 및 Task Role, 로그 그룹, `DATABASE_URL` SSM ARN은 아래 인프라 출력 계약에 맞춰요. DB와 Parameter가 준비된 후 같은 App Subnet 및 ECS Security Group에서 필요한 마이그레이션 Task를 한 번 실행하고 성공을 확인해요.
+8. CI/CD가 등록한 revision으로 ECS Service를 생성하거나 기존 Service를 갱신해요. 기본 Task 수는 2개, Public IP는 비활성화하고 두 App Subnet과 IP Target Group을 사용해요. AZ 재분산과 배포 Circuit Breaker의 롤백을 활성화해요. 새 배포마다 CI/CD가 Service의 Task Definition revision을 갱신하며 Terraform Apply는 이를 관리하지 않아요.
+9. 두 AZ의 정상 Task와 ALB Target을 확인한 후 프론트 빌드 결과를 S3에 업로드해요. API는 같은 CloudFront Origin의 `/api`를 사용해요. `/assets/*`와 `/static/*`에는 콘텐츠 해시가 있는 파일명을 사용하고 HTML은 캐싱하지 않아요.
+10. CloudFront HTTPS 주소에서 SPA 직접 접근, 인증 헤더, 쿠키, Query String, POST/PATCH/DELETE와 API 4xx/5xx 응답을 검증해요. ALB Host와 전송 구간은 내부 HTTP예요. 앱의 공개 URL과 신뢰할 프록시/HTTPS 인식 설정을 CloudFront에 맞춰 구성하고 로그인 Redirect와 Secure Cookie를 확인해요.
 
 Terraform의 AWS 실행은 `sbh-platform` 프로필을 사용해요. AWS CLI의 운영 확인 명령에도 `--profile sbh-platform --region ap-northeast-2`를 붙여요.
+
+## CI/CD 인프라 출력 계약
+
+CI/CD는 Terraform의 `network.app_subnet_ids`, `backend.ecr_repository_url`, `backend.cluster_name`, `backend.log_group_name`, `backend.execution_role_arn`, `backend.task_role_arn`, `backend.ecs_security_group_id`, `backend.target_group_arn`, `backend.container_name`, `backend.container_port`, `database.database_url_parameter_arn`을 사용해요. Task Definition은 Fargate `awsvpc`, Linux X86_64, CPU 512, 메모리 1024 MiB, `awslogs` 서울 리전, Secret 이름 `DATABASE_URL`과 해당 SSM ARN을 사용해요. Service의 Load Balancer 컨테이너 이름과 포트는 `backend` 출력과 일치해야 해요. CI/CD는 Service의 AZ 재분산과 배포 Circuit Breaker도 설정해야 해요.
+
+CI/CD 배포 주체에는 이미지 업로드, Task Definition 등록, Service 생성과 갱신, 정확한 두 Task Role을 ECS에 전달할 권한이 필요해요. 이 주체와 워크플로의 생성은 이번 Terraform 범위에 없어요. 배포 후에도 Terraform Plan에서 ALB Target Group, 보안 그룹과 Role 변경이 서비스에 미칠 영향을 검토해요.
 
 앱 포트는 최초 인프라 Apply 전에 확정하세요. 기존 Target Group의 포트를 바꾸면 교체가 필요하고 ALB Listener와 활성 서비스가 해당 Target Group을 참조할 수 있어요. 배포 후 포트 변경은 Target Group 이름과 생성/삭제 순서를 별도 검토한 후 진행해요.
 
@@ -45,11 +60,11 @@ VPC에는 Public Subnet과 Public Route Table이 없어요. Regional NAT와 Clou
 
 ## 복구와 Rollback
 
-ECS 배포가 실패하면 Circuit Breaker가 이전 정상 배포로 되돌려요. 최초 배포는 이전 정상 배포가 없어서 자동 복구 대상이 없어요. 서비스 이벤트, 이미지 Digest, Secret 버전, 앱 로그와 Health Check를 확인한 뒤 이전 검증된 Digest로 Plan을 검토하세요.
+CI/CD가 Service의 배포 Circuit Breaker 롤백을 설정했다면 실패 시 이전 정상 배포로 되돌릴 수 있어요. 최초 배포는 이전 정상 배포가 없어서 자동 복구 대상이 없어요. 서비스 이벤트, 이미지 Digest, Parameter 이름과 유형, 앱 로그와 Health Check를 확인한 뒤 CI/CD에서 이전 검증된 Digest로 새 revision을 배포하세요.
 
 RDS Multi-AZ Standby는 자동 장애 전환용이며 읽기 접속 대상이 아니에요. 앱은 Primary DNS를 사용하고 연결 풀에 재연결과 재시도 정책을 적용해야 해요. 장애 전환 시 기존 연결이 끊길 수 있어요. 데이터 복구는 자동 백업의 시점 복구 또는 스냅샷에서 새 인스턴스를 만든 뒤 접속 대상을 변경하는 절차로 진행해요. [RDS Multi-AZ 동작](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/Concepts.MultiAZSingleStandby.html)
 
-앱 Secret 값을 회전하면 실행 중인 Task의 환경변수는 자동으로 갱신되지 않아요. DB 계정 암호와 Secret 버전을 함께 변경하고 승인된 새 배포로 Task를 교체한 뒤 두 AZ의 접속을 확인해요.
+`DATABASE_URL` Parameter 값을 회전해도 실행 중인 Task의 환경변수는 자동으로 갱신되지 않아요. DB 계정 암호와 Parameter 값을 함께 변경하고 승인된 새 배포로 Task를 교체한 뒤 두 AZ의 접속을 확인해요.
 
 프론트엔드는 S3 버전 관리로 이전 객체를 복원할 수 있어요. 콘텐츠 해시 파일명을 사용하고 필요한 경로만 CloudFront Invalidation으로 갱신하세요. State 복구는 Backend 버킷의 버전 관리에 따라 진행하며 State를 변경하기 전 실제 리소스와 Plan을 대조해요.
 

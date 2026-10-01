@@ -35,10 +35,10 @@ module "execution_policy" {
         Resource = local.ecs_log_stream_arn
       },
       {
-        Sid      = "ReadApplicationDatabaseSecret"
+        Sid      = "ReadApplicationDatabaseUrl"
         Effect   = "Allow"
-        Action   = ["secretsmanager:GetSecretValue"]
-        Resource = aws_secretsmanager_secret.app_database.arn
+        Action   = ["ssm:GetParameters"]
+        Resource = local.database_url_parameter_arn
       },
     ]
   })

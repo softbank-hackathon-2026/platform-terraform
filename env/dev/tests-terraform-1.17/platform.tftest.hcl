@@ -34,9 +34,6 @@ mock_provider "aws" {
   mock_resource "aws_ecs_cluster" {
     defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:cluster/sbh-platform-dev-ecs-api" }
   }
-  mock_resource "aws_ecs_task_definition" {
-    defaults = { arn = "arn:aws:ecs:ap-northeast-2:123456789012:task-definition/sbh-platform-dev-ecs-api:1" }
-  }
   mock_resource "aws_cloudfront_function" {
     defaults = { arn = "arn:aws:cloudfront::123456789012:function/sbh-platform-dev-cloudfront-spa" }
   }
@@ -55,9 +52,6 @@ mock_provider "aws" {
         kms_key_id    = "arn:aws:kms:ap-northeast-2:123456789012:key/12345678-1234-1234-1234-123456789012"
       }]
     }
-  }
-  mock_resource "aws_secretsmanager_secret" {
-    defaults = { arn = "arn:aws:secretsmanager:ap-northeast-2:123456789012:secret:sbh-platform-dev-secret-db-app-AbCdEf" }
   }
 }
 
@@ -141,10 +135,14 @@ run "infrastructure_only" {
         "ap-northeast-2a" = "nat-regional"
         "ap-northeast-2c" = "nat-regional"
       } &&
-      output.backend.service_name == null && output.backend.task_definition_arn == null &&
-      aws_secretsmanager_secret.app_database.arn != output.database.master_secret_arn
+      output.backend.cluster_name == "sbh-platform-dev-ecs-api" &&
+      output.backend.ecs_security_group_id == "sg-ecs" &&
+      output.backend.target_group_arn == module.alb.target_group_arns["api"] &&
+      output.backend.container_name == "app" && output.backend.container_port == 8000 &&
+      output.database.database_url_parameter_arn == "arn:aws:ssm:ap-northeast-2:123456789012:parameter/sbh/platform/demo/backend/DATABASE_URL" &&
+      output.database.master_secret_arn != null
     )
-    error_message = "Public Subnet 없는 App/DB 계층, Regional NAT 하나, 초기 서비스 생략과 관리자/앱 Secret 분리가 필요합니다."
+    error_message = "Private App/DB 계층, Regional NAT, CI/CD 인프라 출력과 SSM Parameter ARN이 필요합니다."
   }
 
   assert {
@@ -164,44 +162,21 @@ run "infrastructure_only" {
   }
 }
 
-run "activate_default_port" {
+run "custom_port_handoff" {
   command = plan
   variables {
-    backend_image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    health_check_path    = "/api/ready"
+    container_port    = 9090
+    health_check_path = "/api/ready"
   }
   assert {
     condition = (
-      output.backend.service_name == "sbh-platform-dev-ecs-api" &&
-      aws_vpc_security_group_ingress_rule.alb_to_ecs.from_port == 8000 &&
-      aws_vpc_security_group_egress_rule.alb_to_ecs.to_port == 8000
-    )
-    error_message = "기본 백엔드 포트 8000을 ALB와 ECS 사이에 적용해야 합니다."
-  }
-}
-
-run "activate_two_tasks" {
-  command = plan
-  variables {
-    backend_image_digest = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
-    container_port       = 9090
-    health_check_path    = "/api/ready"
-  }
-  assert {
-    condition = (
-      output.backend.service_name == "sbh-platform-dev-ecs-api" &&
-      output.backend.task_definition_arn != null &&
+      output.backend.container_port == 9090 &&
+      module.alb.target_group_arns["api"] == output.backend.target_group_arn &&
       aws_vpc_security_group_ingress_rule.alb_to_ecs.from_port == 9090 &&
       aws_vpc_security_group_egress_rule.alb_to_ecs.to_port == 9090
     )
-    error_message = "Digest 지정 시 Service를 활성화하고 앱 포트 변경을 연결해야 합니다."
+    error_message = "CI/CD에 전달하는 포트와 ALB, 보안 그룹 포트가 일치해야 합니다."
   }
-}
-
-run "reject_tag_instead_of_digest" {
-  command = plan
-  variables { backend_image_digest = "latest" }
-  expect_failures = [var.backend_image_digest]
 }
 
 run "reject_empty_tag_value" {
