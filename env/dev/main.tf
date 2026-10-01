@@ -75,6 +75,8 @@ module "cloudfront" {
   source = "../../modules/cloudfront"
 
   name                  = local.name
+  alternate_domain_name = aws_acm_certificate.frontend.domain_name
+  acm_certificate_arn   = aws_acm_certificate_validation.frontend.certificate_arn
   s3_origin_domain_name = module.frontend.bucket_regional_domain_name
   alb_arn               = module.alb.load_balancer_arn
   alb_dns_name          = module.alb.dns_name

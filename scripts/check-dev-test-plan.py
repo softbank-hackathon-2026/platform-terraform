@@ -32,6 +32,7 @@ def check_plan(plan, port, health_path):
         "aws_iam_role", "aws_iam_policy",
         "aws_ecr_repository", "aws_s3_bucket",
         "aws_cloudfront_distribution", "aws_cloudfront_vpc_origin", "aws_cloudfront_function",
+        "aws_acm_certificate",
     }
     required_tags = {
         "Project": "SBH", "Scope": "platform", "Environment": "dev",
@@ -117,6 +118,13 @@ def check_plan(plan, port, health_path):
     require(attrs('module.alb.aws_lb_listener.forward["http"]')["port"] == 80, "ALB listener must be HTTP 80")
 
     distribution = attrs("module.cloudfront.aws_cloudfront_distribution.this")
+    certificate = attrs("aws_acm_certificate.frontend")
+    require(certificate["domain_name"] == "sbh.howon.me" and certificate["validation_method"] == "DNS", "ACM certificate must validate the custom domain with DNS")
+    require(certificate["options"][0]["export"] == "DISABLED", "ACM certificate must not be exportable")
+    require(distribution["aliases"] == ["sbh.howon.me"], "CloudFront alias mismatch")
+    viewer = distribution["viewer_certificate"][0]
+    require(viewer["acm_certificate_arn"] == certificate["arn"] and viewer["ssl_support_method"] == "sni-only", "CloudFront must use the ACM certificate with SNI")
+    require(viewer["minimum_protocol_version"] == "TLSv1.2_2021", "CloudFront minimum TLS policy mismatch")
     origins = {o["origin_id"]: o for o in distribution["origin"]}
     require(set(origins) == {"frontend", "api"}, "CloudFront needs S3 and VPC origins")
     behaviors = {b["path_pattern"]: b for b in distribution["ordered_cache_behavior"]}

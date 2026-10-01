@@ -14,8 +14,8 @@ output "domain_name" {
 }
 
 output "url" {
-  description = "프론트엔드와 API의 기본 HTTPS 주소입니다."
-  value       = "https://${aws_cloudfront_distribution.this.domain_name}"
+  description = "프론트엔드와 API의 HTTPS 주소입니다. 사용자 도메인이 있으면 해당 도메인을 사용합니다."
+  value       = "https://${var.alternate_domain_name == null ? aws_cloudfront_distribution.this.domain_name : var.alternate_domain_name}"
 }
 
 output "vpc_origin_id" {

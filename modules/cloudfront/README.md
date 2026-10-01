@@ -7,6 +7,8 @@
 | 속성 | 타입 | 기본값 | 역할 |
 |---|---|---|---|
 | `name` | `string` | 필수 | CloudFront 리소스 이름 접두사예요. 소문자, 숫자, 단일 하이픈을 사용하며 최대 45자예요. |
+| `alternate_domain_name` | `string` | `null` | 선택적 사용자 도메인이에요. `acm_certificate_arn`과 함께 설정해요. |
+| `acm_certificate_arn` | `string` | `null` | 해당 도메인을 포함하는 미국 동부 리전 ACM 인증서 ARN이에요. |
 | `s3_origin_domain_name` | `string` | 필수 | S3 버킷의 리전별 REST 도메인이에요. |
 | `alb_arn` | `string` | 필수 | Internal ALB ARN이에요. |
 | `alb_dns_name` | `string` | 필수 | Internal ALB DNS 이름이에요. |
@@ -19,7 +21,7 @@
 | `distribution_id` | Distribution ID예요. |
 | `distribution_arn` | S3 버킷 정책의 SourceArn에 사용할 ARN이에요. |
 | `domain_name` | CloudFront 기본 도메인이에요. |
-| `url` | 기본 HTTPS 주소예요. |
+| `url` | 사용자 도메인이 있으면 해당 HTTPS 주소이고, 없으면 CloudFront 기본 HTTPS 주소예요. |
 | `vpc_origin_id` | Internal ALB VPC Origin ID예요. |
 | `origin_access_control_id` | S3 OAC ID예요. |
 | `spa_function_arn` | SPA Function ARN이에요. |
@@ -34,6 +36,8 @@
 | 그 외 | S3 | CachingDisabled | 확장자가 없는 마지막 경로를 `/index.html`로 바꿔요. |
 
 SPA Function은 기본 프론트 Behavior에만 연결돼요. API 경로는 그대로 전달하고 4xx/5xx 응답 코드와 본문은 보존해요. 오류 캐시 TTL은 0으로 설정하며 HTML 오류 페이지로 치환하지 않아요. 파일이 없는 경우 S3의 403/404도 원래대로 전달돼요.
+
+사용자 도메인을 설정하면 미국 동부 리전 ACM 인증서를 SNI 방식으로 연결하고 최소 TLS 정책으로 `TLSv1.2_2021`을 사용해요. 두 입력이 모두 없으면 기존 기본 인증서를 사용해요. [CloudFront 인증서 요구사항](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/cnames-and-https-requirements.html)
 
 API는 `Managed-AllViewerExceptHostHeader` Origin Request Policy를 사용해요. Authorization을 포함한 요청 헤더, 쿠키와 Query String을 전달하며 Host는 ALB 도메인으로 바뀌어요. 프론트엔드에서는 같은 Origin의 상대 경로 `/api`를 사용하세요. 외부 Origin의 CORS 허용과 사용자 인증은 애플리케이션에서 구성해야 해요. [AWS 관리형 요청 정책](https://docs.aws.amazon.com/AmazonCloudFront/latest/DeveloperGuide/using-managed-origin-request-policies.html)
 

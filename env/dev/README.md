@@ -65,7 +65,7 @@ CloudFront OAC처럼 태그를 지원하지 않는 구성 요소는 서비스가
 | `network` | `nat_gateway_ids` | 두 App AZ 키가 같은 Regional NAT ID를 가리켜요. |
 | `frontend` | `bucket_name` | 프론트엔드 버킷 이름이에요. 계정 ID로 고유성을 확보해요. |
 | `frontend` | `distribution_id` | CloudFront ID예요. |
-| `frontend` | `url` | 기본 HTTPS 주소예요. |
+| `frontend` | `url` | 현재 State의 사용자 도메인 HTTPS 주소 `https://sbh.howon.me`예요. |
 | `backend` | `ecr_repository_url` | 이미지 저장소 주소예요. |
 | `backend` | `cluster_name` | ECS Cluster 이름이에요. |
 | `backend` | `cluster_arn` | ECS Cluster ARN이에요. |
@@ -106,7 +106,7 @@ AWS_PROFILE=sbh-platform ./tf dev plan -input=false
 
 Terraform Plan은 잠금 파일을 잠시 생성하고 삭제할 수 있어요. Backend IAM에는 State 읽기/쓰기와 잠금 파일의 Get/Put/Delete 권한이 필요해요. 버킷 버전 관리와 암호화 설정도 별도로 유지하세요. [S3 Backend 권한](https://developer.hashicorp.com/terraform/language/backend/s3)
 
-이번 작업은 Apply를 실행하지 않아요. 로컬 테스트, 실제 Plan, Apply와 배포 상태는 [AI-DLC 기록](../../docs/ai-dlc/ecs-postgresql-platform.md)에서 구분해요.
+2026-10-01 사용자 도메인 Apply 후 S3 Backend State에는 관리 리소스 인스턴스 48개가 있어요. 아래의 생성 Plan은 그 전 시점 기록이에요. ACM 인증서 발급과 기존 CloudFront 배포본의 별칭 및 인증서 적용은 끝났고, 사용자는 외부 접속이 정상이라고 확인했어요. 현재 컴퓨터에서는 보안 DNS 차단 때문에 HTTPS 응답 코드를 직접 확인할 수 없었어요. [별도 AI-DLC 기록](../../docs/ai-dlc/dev-cloudfront-custom-domain.md)을 확인해요.
 
 ## 로컬 검증
 
@@ -121,6 +121,6 @@ python3 scripts/check-dev-test-plan.py .local/dev-tests.jsonl
 node --test modules/cloudfront/tests/spa.test.cjs
 ```
 
-AWS와 Random Provider를 mock으로 대체해 자격 증명 없이 테스트해요. 기존 RDS 모듈에는 두 Provider의 ephemeral 선언이 있어 1.16.4에서 결합 mock 테스트가 실행되지 않아요. 기존 RDS 테스트와 같은 방식으로 `tests-terraform-1.17`에 테스트를 분리하고, [공식 1.17.0-beta2 테스트 CLI](https://releases.hashicorp.com/terraform/1.17.0-beta2/)를 Git 제외 폴더에 내려받아 SHA-256을 확인한 뒤 사용했어요. 모듈과 실제 Plan은 1.11 이상에서 사용해요. CI/CD 소유 경계 변경 후 안정 버전 1.15.4로 실행한 실제 Plan은 46개 생성, 변경과 삭제 0개예요. Task Definition과 Service는 Plan에 없어요. mock 테스트는 AWS 리소스나 Backend State를 만들지 않아요.
+AWS와 Random Provider를 mock으로 대체해 자격 증명 없이 테스트해요. 기존 RDS 모듈에는 두 Provider의 ephemeral 선언이 있어 1.16.4에서 결합 mock 테스트가 실행되지 않아요. 기존 RDS 테스트와 같은 방식으로 `tests-terraform-1.17`에 테스트를 분리하고, [공식 1.17.0-beta2 테스트 CLI](https://releases.hashicorp.com/terraform/1.17.0-beta2/)를 Git 제외 폴더에 내려받아 SHA-256을 확인한 뒤 사용했어요. 모듈과 실제 Plan은 1.11 이상에서 사용해요. CI/CD 소유 경계 변경 후 안정 버전 1.15.4로 실행한 당시 실제 Plan은 46개 생성, 변경과 삭제 0개였어요. 당시 Task Definition과 Service는 Plan에 없었어요. mock 테스트는 AWS 리소스나 Backend State를 만들지 않아요.
 
 기본 포트와 재정의 포트의 인프라 Plan을 검사해요. Private Subnet 4개, Regional NAT 1개, Public Subnet과 수동 EIP 부재, DB 경로 격리, RDS Multi-AZ, 실행 역할의 SSM 최소 권한, CI/CD 인수인계 출력과 Terraform 관리 Task Definition 및 Service 부재를 확인해요. Plan은 Parameter 값의 존재나 실제 DB 연결을 증명하지 않아요. 배포와 운영 절차는 [Runbook](../../docs/runbooks/ecs-postgresql-platform.md)에 있어요.

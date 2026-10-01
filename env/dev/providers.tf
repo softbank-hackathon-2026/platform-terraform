@@ -6,3 +6,9 @@ provider "aws" {
     tags = local.tags
   }
 }
+
+provider "aws" {
+  alias   = "us_east_1"
+  profile = "sbh-platform"
+  region  = "us-east-1"
+}

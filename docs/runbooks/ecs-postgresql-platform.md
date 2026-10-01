@@ -2,12 +2,20 @@
 
 작성일: 2026-10-01
 
-이 문서는 후속 배포를 위한 절차예요. 이번 작업에서는 Apply, 프론트 파일/이미지 업로드, DB 계정 생성, ECS 시작과 장애 전환을 실행하지 않아요. 현재 구현과 실제 검증 결과는 [AI-DLC](../ai-dlc/ecs-postgresql-platform.md)에 기록해요.
+이 문서는 인프라와 앱 배포 절차예요. 2026-10-01 사용자 도메인 Apply 후 S3 Backend State에는 관리 리소스 인스턴스 48개가 기록되어 있어요. 실제 리소스 상태는 새 Plan과 서비스 조회로 다시 확인하세요. 기존 구현 검증은 [Platform AI-DLC](../ai-dlc/ecs-postgresql-platform.md), 사용자 도메인 작업은 [CloudFront AI-DLC](../ai-dlc/dev-cloudfront-custom-domain.md)에 기록해요.
+
+## CloudFront 사용자 도메인
+
+`sbh.howon.me`는 기존 CloudFront 배포본 `ECSDZ4JA6Z85U`에 연결해요. Cloudflare의 서비스용 CNAME은 `d2ixsg0owj0zhf.cloudfront.net`을 가리키고 `DNS only`여야 해요. 인증서 검증용 CNAME은 별도의 이름과 대상이에요. 인증서 요청 후 ACM이 제공하는 값으로 Cloudflare에 `DNS only` 레코드를 등록하고 인증서가 `ISSUED`가 될 때까지 기다려요.
+
+먼저 현재 State와 전체 Plan을 확인한 뒤 `aws_acm_certificate.frontend`만 대상으로 인증서 요청을 Apply해요. 대상 지정 Apply는 이 초기 발급 단계에만 사용해요. 검증 CNAME과 인증서 상태를 확인한 뒤 전체 Plan을 다시 실행하고, 기존 배포본 변경 외에 예상하지 않은 변경이나 삭제가 없을 때 적용해요. 적용 후 ACM `ISSUED`, CloudFront `Deployed`, 별칭과 인증서 ARN, 공개 DNS CNAME과 `https://sbh.howon.me`의 TLS 및 HTTP 응답을 각각 확인해요.
+
+복구할 때는 먼저 배포본의 별칭과 사용자 인증서를 Terraform으로 제거하고 기본 인증서 배포가 완료됐는지 확인해요. 그 뒤 필요하면 Cloudflare 서비스용 CNAME을 정리하고 ACM 인증서를 제거해요. CloudFront에 연결된 인증서는 먼저 삭제하지 않아요.
 
 ## 배포 순서
 
 1. `sbh-platform` 인증, 서울 리전과 기존 S3 Backend를 확인해요. State Key는 dev 전용으로 유지해요. `AWS_PROFILE=sbh-platform ./tf dev plan`에서 변경과 삭제, 활성 AZ별 비용이 발생하는 Regional NAT 1개, ALB, RDS Multi-AZ를 검토해요.
-2. 후속 Apply 승인 후 인프라 준비 구성을 적용해요. Terraform은 ECS Cluster와 로그 그룹을 만들지만 Task Definition과 Service는 만들지 않아요. CI/CD가 서비스를 배포하기 전에는 ALB Target이 비어 있으므로 `/api`의 503은 예상 상태예요.
+2. 초기 구축이 필요한 환경에서는 승인 후 인프라 준비 구성을 적용해요. 이미 State가 있는 dev는 새 Plan의 변경과 삭제를 검토한 뒤 필요한 변경만 적용해요. Terraform은 ECS Cluster와 로그 그룹을 관리하지만 Task Definition과 Service는 관리하지 않아요. CI/CD가 서비스를 배포하기 전에는 ALB Target이 비어 있으므로 `/api`의 503은 예상 상태예요.
 3. VPC 내부에서 DB에 접속할 수 있는 별도 관리 경로를 준비해요. 현재 Terraform에는 DB 접근용 공개 포트, Bastion과 관리자 ECS Task가 없어요. RDS 관리자 Secret으로 접속해 실제 `db_name`의 앱 전용 사용자를 만들고 필요한 스키마 권한만 부여해요. 관리자 계정을 앱에서 사용하지 않아요. 현재 기본 DB 이름은 `freesia`예요.
 4. 승인된 운영 경로에서 `/sbh/platform/demo/backend/DATABASE_URL`을 SecureString으로 등록해요. 기본 `aws/ssm` 키를 사용하면 ECS 실행 역할에 추가 KMS 권한은 필요하지 않아요. 값은 실제 앱 사용자, URL 인코딩된 비밀번호, RDS Writer 주소와 DB 이름을 사용해 `postgresql+psycopg://<앱 사용자>:<URL 인코딩된 암호>@<DB 주소>:5432/<DB 이름>?sslmode=require` 형식으로 만들어요. 예약 문자 `@`, `:`, `/`, `?`, `#` 등은 비밀번호 안에서 URL 인코딩해야 해요. 값과 비밀번호를 Terraform 변수, 출력, 명령행 인자와 로그에 넣지 마세요. 고객 관리 KMS 키를 사용한다면 해당 키의 `kms:Decrypt` 권한을 실행 역할에 추가한 뒤 배포해요.
 5. 값 자체를 조회하지 않는 아래 명령으로 Parameter의 Name, Type과 KeyId를 확인해요. 현재 조회 결과에는 지정 Parameter가 없었으므로 첫 배포 전에 반드시 등록 여부를 다시 확인해야 해요. 이름과 Type이 맞아도 URL 내용과 DB 연결 성공은 별도로 검증해야 해요.

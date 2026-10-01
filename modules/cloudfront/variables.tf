@@ -8,6 +8,18 @@ variable "name" {
   }
 }
 
+variable "alternate_domain_name" {
+  description = "선택적 CloudFront 사용자 도메인입니다. ACM 인증서 ARN과 함께 설정합니다."
+  type        = string
+  default     = null
+}
+
+variable "acm_certificate_arn" {
+  description = "선택적 us-east-1 ACM 공개 인증서 ARN입니다. 사용자 도메인과 함께 설정합니다."
+  type        = string
+  default     = null
+}
+
 variable "s3_origin_domain_name" {
   description = "S3 버킷의 리전별 REST 도메인입니다. 웹사이트 엔드포인트가 아닙니다."
   type        = string

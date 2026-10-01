@@ -30,6 +30,25 @@ run "private_origins_and_https" {
   }
 }
 
+run "custom_domain_https" {
+  command = plan
+  variables {
+    alternate_domain_name = "sbh.howon.me"
+    acm_certificate_arn   = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+  }
+
+  assert {
+    condition = (
+      aws_cloudfront_distribution.this.aliases == toset(["sbh.howon.me"]) &&
+      aws_cloudfront_distribution.this.viewer_certificate[0].acm_certificate_arn == var.acm_certificate_arn &&
+      aws_cloudfront_distribution.this.viewer_certificate[0].ssl_support_method == "sni-only" &&
+      aws_cloudfront_distribution.this.viewer_certificate[0].minimum_protocol_version == "TLSv1.2_2021" &&
+      output.url == "https://sbh.howon.me"
+    )
+    error_message = "사용자 도메인은 us-east-1 ACM 인증서와 SNI HTTPS를 사용해야 합니다."
+  }
+}
+
 run "api_forwarding_and_spa_separation" {
   command = plan
 
@@ -66,10 +85,10 @@ run "api_forwarding_and_spa_separation" {
       alltrue([
         for response in aws_cloudfront_distribution.this.custom_error_response :
         response.error_caching_min_ttl == 0 &&
-        contains([null, ""], response.response_page_path) &&
-        contains([null, 0], response.response_code)
+        (response.response_page_path == null || response.response_page_path == "") &&
+        (response.response_code == null || response.response_code == 0)
       ]) &&
-      alltrue([for origin in aws_cloudfront_distribution.this.origin : contains([null, ""], origin.origin_path)])
+      alltrue([for origin in aws_cloudfront_distribution.this.origin : origin.origin_path == null || origin.origin_path == ""])
     )
     error_message = "HTML 캐싱 비활성화, 정적 파일 캐싱, API 원래 경로와 오류 응답 보존을 유지해야 합니다."
   }

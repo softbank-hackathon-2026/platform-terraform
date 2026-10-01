@@ -2,7 +2,7 @@
 
 마지막 확인일: 2026-10-01
 
-이 저장소는 환경별 Terraform 실행기와 재사용 가능한 AWS Terraform 모듈을 제공합니다. `env/dev`에 ECS와 PostgreSQL Multi-AZ Root Module을 구현했습니다. 최신 Unit 9 변경 후 `sbh-platform` 실제 AWS Plan은 46개 생성, 변경과 삭제 0개였습니다. Apply와 배포는 하지 않았습니다. `env/stg`와 `env/prd`는 아직 Root Module이 없습니다.
+이 저장소는 환경별 Terraform 실행기와 재사용 가능한 AWS Terraform 모듈을 제공합니다. `env/dev`에 ECS와 PostgreSQL Multi-AZ Root Module을 구현했습니다. Unit 9의 46개 생성 Plan은 당시 기록입니다. 2026-10-01 사용자 도메인 작업의 Apply 이후 S3 State는 serial 9, 관리 리소스 인스턴스 48개입니다. 기존 인프라를 처음 생성한 Apply 명령과 애플리케이션 배포 여부는 이번 조회로 확인하지 못했습니다. `env/stg`와 `env/prd`는 아직 Root Module이 없습니다.
 
 ## 새 세션에서 확인할 순서
 
@@ -40,6 +40,8 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 
 ## 진행 현황
 
+아래 검증과 Plan 수치는 각 Unit을 완료한 시점의 기록입니다. 현재 dev Backend State에는 관리 리소스 인스턴스 48개가 있으며 실제 리소스별 상태와 드리프트는 새 Plan으로 확인해야 합니다.
+
 | 작업 단위 | 구현 | 로컬 검증 | AWS Plan과 Apply | Git 상태 | 상세 기록 |
 |---|---|---|---|---|---|
 | `tf` 실행기 | 완료 | `bash -n` 통과, 자동 기능 테스트 없음 | 해당 없음 | 커밋 `d051afd` | [`tf`](../tf) |
@@ -62,6 +64,7 @@ docs/runbooks              후속 배포, 모니터링과 복구 절차
 | dev `DATABASE_URL` Parameter Store | Unit 7 구현과 Review 완료. 값 등록은 별도 운영 작업 | fmt, validate, dev mock 6개와 전체 Plan 점검 3개 통과 | 46 add / 0 change / 0 destroy, Parameter 미등록, Apply 미수행 | 구현 커밋 `2886bd4` 원격 main 확인 | [Unit 7](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-database_url-parameter-store-연동) |
 | dev ECS 배포 소유 경계 | Unit 8 구현과 Review 완료. Terraform은 기반 인프라, CI/CD는 Task Definition과 Service 소유 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, Task Definition과 Service 없음, Apply 미수행 | 구현 커밋 `2886bd4` 원격 main 확인 | [Unit 8](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-ecs-배포-소유-경계) |
 | dev 초기 DB 이름 `freesia` | Unit 9 구현과 Review 완료 | fmt, validate, mock 4개와 전체 Plan 점검 2개 통과 | 46 add / 0 change / 0 destroy, RDS 이름 `freesia`, Apply 미수행 | 구현 커밋 `c0df773` 원격 main 확인 | [Unit 9](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia) |
+| dev CloudFront 사용자 도메인 `sbh.howon.me` | Unit 10 구현, 인증서 발급과 기존 배포본 적용 완료. 사용자 외부 접속 정상 보고 | fmt, validate, CloudFront mock 4개, dev mock 4개, 전체 Plan 검사 2개 통과 | ACM 요청 1 add, 최종 1 add / 1 change / 0 destroy Apply 완료. CloudFront `Deployed`. 적용 후 Origin 표현 차이 1 change Plan 미적용 | 이 변경의 커밋과 푸시 미수행 | [사용자 도메인 AI-DLC](./ai-dlc/dev-cloudfront-custom-domain.md) |
 | 지속 문서화 | RDS, ECR 진행 상태 반영, 기존 10개 모듈 README의 입력, 출력 속성 표 정리와 향후 유지 규칙 추가 | 입력 97개, 출력 49개 코드 대조 및 문서 공백 점검 완료 | 해당 없음 | ECR, README 표, 규칙 커밋 `3f6dbdd` 원격 main 확인 | 이 문서 |
 
 IAM 구현 커밋 `2190a91`을 푸시한 직후 로컬 `HEAD`, `origin/main`, 원격 main의 SHA가 모두 `2190a91b4e6023492d71023f6c69a959d1a825b3`인 것을 확인했습니다.
@@ -154,7 +157,11 @@ Zonal NAT는 AZ별 Public Subnet 키를 직접 선택하고 Regional NAT는 Subn
 
 ## 현재 작업과 다음 단계
 
-dev 초기 DB 이름을 `sbhapp`에서 `freesia`로 바꾸는 Unit 9 구현과 Review를 마쳤습니다. [AI-DLC 기록](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia)에 dev 기본값, 문서와 검증 결과를 남겼습니다. fmt, validate, dev mock 4개와 전체 Plan 점검 2개가 통과했고 실제 AWS Plan은 46 add / 0 change / 0 destroy, DB 이름 `freesia`입니다. 현재 Terraform State의 관리 리소스 목록은 비어 있습니다. 후속 요청으로 구현 커밋 `c0df773`를 `main`에 푸시해 원격 SHA 일치를 확인했습니다. Apply와 배포는 수행하지 않았습니다.
+현재 작업은 [dev CloudFront 사용자 도메인](./ai-dlc/dev-cloudfront-custom-domain.md) 연결입니다. Ideation, Inception과 Unit 10 계획을 승인받아 Terraform 구현, 로컬 검증, ACM `ISSUED`와 기존 배포본 `ECSDZ4JA6Z85U`의 Apply를 완료했습니다. AWS에서는 `Deployed`, 별칭 `sbh.howon.me`, 비내보내기 인증서와 SNI 정책을 확인했고 State의 `frontend.url`도 사용자 도메인입니다. 사용자는 외부에서 정상 접속됐다고 확인했습니다. 이 컴퓨터의 DNS가 도메인을 보안 차단 주소로 바꿔 서비스용 CNAME의 정확한 대상과 응답 코드는 독립 확인하지 못했습니다. 적용 후 Plan의 CloudFront Origin 표현 차이 1건은 추가 적용하지 않았습니다. 이 변경의 커밋과 푸시는 수행하지 않았습니다.
+
+2026-10-01 사용자 도메인 Apply 전 S3 Backend State 조회에서는 관리 리소스 인스턴스 46개와 기존 CloudFront 배포본을 확인했고, 이번 두 단계 Apply 후에는 48개입니다. 아래의 “Apply 미수행” 문구는 각 과거 Unit을 기록한 당시 결과이며 현재 AWS에 리소스가 없다는 뜻은 아닙니다. 기존 인프라 생성 Apply 명령은 확인하지 못했고 애플리케이션 배포 상태도 별도로 검증해야 합니다.
+
+dev 초기 DB 이름을 `sbhapp`에서 `freesia`로 바꾸는 Unit 9 구현과 Review를 마쳤습니다. [AI-DLC 기록](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-초기-db-이름-freesia)에 dev 기본값, 문서와 당시 검증 결과를 남겼습니다. fmt, validate, dev mock 4개와 전체 Plan 점검 2개가 통과했고 당시 실제 AWS Plan은 46 add / 0 change / 0 destroy, DB 이름 `freesia`였습니다. 당시 State의 관리 리소스 목록은 비어 있었습니다. 후속 요청으로 구현 커밋 `c0df773`를 `main`에 푸시해 원격 SHA 일치를 확인했습니다. 해당 작업에서 Apply와 배포는 수행하지 않았습니다.
 
 CI/CD가 dev Task Definition과 Service를 소유하고 Terraform은 ECS 기반 인프라만 관리하도록 [Unit 8 변경](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-ecs-배포-소유-경계)을 구현했습니다. 이미지 Digest 입력과 Terraform의 Task Definition 및 Service 생성 경로를 제거하고 인프라 출력 계약을 추가했습니다. mock 4개와 전체 Plan 점검 2개가 통과했고 실제 AWS Plan은 46 add / 0 change / 0 destroy입니다. 후속 요청으로 Unit 7과 8의 구현 커밋 `2886bd4`를 `main`에 푸시해 원격 SHA 일치를 확인했습니다. Apply와 CI/CD 배포는 수행하지 않았습니다.
 
@@ -167,7 +174,7 @@ dev Regional NAT와 private-only VPC 전환의 Ideation, Inception과 단일 Uni
 이전 ECS/PostgreSQL 구현 커밋 `c1a36ed4ba9093dc68dde5fbc71fb5808dbbadf0`은 `codex/ecs-postgresql-dev`에 푸시됐습니다. 이후 제공한 네이밍과 태깅 규칙을 `env/dev`와 연결 모듈에 적용해 로컬 검증과 실제 AWS Plan 검토를 마쳤습니다. 이 변경은 `main`에 커밋하고 원격 SHA 일치를 확인했습니다. 이번 백엔드 내부 포트 8000 변경도 로컬 검증과 실제 AWS Plan 검토를 마치고 `main`에 커밋해 원격 SHA 일치를 확인했습니다. 상세 범위와 검증은 [Platform AI-DLC](./ai-dlc/ecs-postgresql-platform.md#후속-변경-dev-백엔드-내부-포트-8000)에 기록했습니다.
 
 1. ADR의 팀 승인 상태는 별도로 확인합니다.
-2. 별도 배포 요청을 받은 후 인프라 Apply를 진행합니다. 이번 작업은 Apply, 업로드, DB 계정 생성, ECS 시작과 장애 전환을 수행하지 않았습니다.
+2. 사용자 도메인은 AWS 적용과 사용자 접속 확인을 완료했습니다. 서비스용 CNAME 대상과 HTTP 상태 코드의 독립 검증이 필요하면 차단되지 않은 네트워크에서 확인합니다. 적용 후 Origin 블록 표현 차이가 보이는 Plan은 별도 원인 검토 전 추가 적용하지 않습니다.
 3. 앱 이미지, DB 사용자와 `DATABASE_URL` SecureString, 프론트 빌드를 준비한 뒤 CI/CD가 Task Definition과 Service를 배포합니다. 그 전에 마이그레이션 Task를 실행하고, 배포 후 두 AZ 배치와 API/DB 접속을 검증합니다. 배포 주체와 워크플로는 아직 이 저장소에서 구현하지 않았습니다.
 4. EKS의 미완료 Unit 3~5와 stg/prd Root Module은 기존 후속 작업으로 남깁니다. 일반 RDS RR의 모듈 소유 Secret 회전/복구도 별도 운영 작업입니다.
 5. 계획, 로컬 테스트, AWS Plan, Apply, 배포, 커밋과 푸시를 계속 구분합니다.

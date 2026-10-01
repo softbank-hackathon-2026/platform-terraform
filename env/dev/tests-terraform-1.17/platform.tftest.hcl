@@ -55,6 +55,22 @@ mock_provider "aws" {
   }
 }
 
+mock_provider "aws" {
+  alias           = "us_east_1"
+  override_during = plan
+  mock_resource "aws_acm_certificate" {
+    defaults = {
+      arn = "arn:aws:acm:us-east-1:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+      domain_validation_options = [{
+        domain_name           = "sbh.howon.me"
+        resource_record_name  = "_validation.sbh.howon.me."
+        resource_record_type  = "CNAME"
+        resource_record_value = "_validation.acm-validations.aws."
+      }]
+    }
+  }
+}
+
 mock_provider "random" {
   override_during = plan
 }
@@ -140,7 +156,10 @@ run "infrastructure_only" {
       output.backend.target_group_arn == module.alb.target_group_arns["api"] &&
       output.backend.container_name == "app" && output.backend.container_port == 8000 &&
       output.database.database_url_parameter_arn == "arn:aws:ssm:ap-northeast-2:123456789012:parameter/sbh/platform/demo/backend/DATABASE_URL" &&
-      output.database.master_secret_arn != null
+      output.database.master_secret_arn != null &&
+      output.frontend.url == "https://sbh.howon.me" &&
+      module.cloudfront.domain_name == "test-platform.cloudfront.net" &&
+      module.cloudfront.url == "https://sbh.howon.me"
     )
     error_message = "Private App/DB 계층, Regional NAT, CI/CD 인프라 출력과 SSM Parameter ARN이 필요합니다."
   }

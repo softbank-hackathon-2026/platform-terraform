@@ -42,6 +42,7 @@ resource "aws_cloudfront_function" "spa" {
 
 resource "aws_cloudfront_distribution" "this" {
   enabled             = true
+  aliases             = var.alternate_domain_name == null ? [] : [var.alternate_domain_name]
   is_ipv6_enabled     = true
   comment             = "${var.name}-cloudfront-web"
   default_root_object = "index.html"
@@ -131,7 +132,17 @@ resource "aws_cloudfront_distribution" "this" {
   }
 
   viewer_certificate {
-    cloudfront_default_certificate = true
+    cloudfront_default_certificate = var.acm_certificate_arn == null
+    acm_certificate_arn            = var.acm_certificate_arn
+    ssl_support_method             = var.acm_certificate_arn == null ? null : "sni-only"
+    minimum_protocol_version       = var.acm_certificate_arn == null ? null : "TLSv1.2_2021"
+  }
+
+  lifecycle {
+    precondition {
+      condition     = (var.alternate_domain_name == null) == (var.acm_certificate_arn == null)
+      error_message = "alternate_domain_name과 acm_certificate_arn은 함께 설정해야 합니다."
+    }
   }
 
   tags = merge(var.tags, { Name = "${var.name}-cloudfront-web" })
