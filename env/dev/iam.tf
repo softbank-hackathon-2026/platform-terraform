@@ -52,6 +52,18 @@ module "execution_policy" {
         Action   = ["ssm:GetParameters"]
         Resource = "arn:aws:ssm:ap-northeast-2:723225040786:parameter/sbh/platform/demo/backend/GITHUB_DEPLOY_TOKEN"
       },
+      {
+        Sid      = "ReadWorkloadAccessKeyId"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameters"]
+        Resource = "arn:aws:ssm:ap-northeast-2:723225040786:parameter/sbh/platform/demo/backend/WORKLOAD_AWS_ACCESS_KEY_ID"
+      },
+      {
+        Sid      = "ReadWorkloadSecretAccessKey"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameters"]
+        Resource = "arn:aws:ssm:ap-northeast-2:723225040786:parameter/sbh/platform/demo/backend/WORKLOAD_AWS_SECRET_ACCESS_KEY"
+      },
     ]
   })
   tags = local.tags
