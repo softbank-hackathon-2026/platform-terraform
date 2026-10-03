@@ -64,6 +64,18 @@ module "execution_policy" {
         Action   = ["ssm:GetParameters"]
         Resource = "arn:aws:ssm:ap-northeast-2:723225040786:parameter/sbh/platform/demo/backend/WORKLOAD_AWS_SECRET_ACCESS_KEY"
       },
+      {
+        Sid      = "ReadSandboxAccessKeyId"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameters"]
+        Resource = "arn:aws:ssm:ap-northeast-2:723225040786:parameter/sbh/platform/demo/backend/SANDBOX_AWS_ACCESS_KEY_ID"
+      },
+      {
+        Sid      = "ReadSandboxSecretAccessKey"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameters"]
+        Resource = "arn:aws:ssm:ap-northeast-2:723225040786:parameter/sbh/platform/demo/backend/SANDBOX_AWS_SECRET_ACCESS_KEY"
+      },
     ]
   })
   tags = local.tags
